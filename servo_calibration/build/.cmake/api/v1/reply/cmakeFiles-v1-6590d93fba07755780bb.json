@@ -1,0 +1,917 @@
+{
+	"globsDependent" : 
+	[
+		{
+			"expression" : "/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/*.c",
+			"paths" : 
+			[
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.CoarseOrientation.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.Timestamp.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.actuator.ArrayCommand.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.actuator.Command.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.actuator.Status.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.ahrs.MagneticFieldStrength.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.ahrs.MagneticFieldStrength2.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.ahrs.RawIMU.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.ahrs.Solution.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.air_data.AngleOfAttack.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.air_data.IndicatedAirspeed.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.air_data.RawAirData.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.air_data.Sideslip.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.air_data.StaticPressure.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.air_data.StaticTemperature.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.air_data.TrueAirspeed.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.camera_gimbal.AngularCommand.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.camera_gimbal.GEOPOICommand.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.camera_gimbal.Mode.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.camera_gimbal.Status.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.device.Temperature.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.esc.RPMCommand.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.esc.RawCommand.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.esc.Status.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.esc.StatusExtended.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.gnss.Auxiliary.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.gnss.ECEFPositionVelocity.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.gnss.Fix.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.gnss.Fix2.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.gnss.RTCMStream.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.hardpoint.Command.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.hardpoint.Status.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.ice.FuelTankStatus.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.ice.reciprocating.CylinderStatus.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.ice.reciprocating.Status.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.indication.BeepCommand.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.indication.LightsCommand.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.indication.RGB565.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.indication.SingleLightCommand.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.power.BatteryInfo.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.power.CircuitStatus.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.power.PrimaryPowerSupplyStatus.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.range_sensor.Measurement.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.equipment.safety.ArmingStatus.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.navigation.GlobalNavigationSolution.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.AccessCommandShell_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.AccessCommandShell_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.CANIfaceStats.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.DataTypeKind.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.GetDataTypeInfo_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.GetDataTypeInfo_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.GetNodeInfo_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.GetNodeInfo_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.GetTransportStats_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.GetTransportStats_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.GlobalTimeSync.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.HardwareVersion.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.NodeStatus.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.Panic.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.RestartNode_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.RestartNode_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.SoftwareVersion.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.debug.KeyValue.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.debug.LogLevel.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.debug.LogMessage.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.dynamic_node_id.Allocation.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.dynamic_node_id.server.AppendEntries_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.dynamic_node_id.server.AppendEntries_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.dynamic_node_id.server.Discovery.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.dynamic_node_id.server.Entry.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.dynamic_node_id.server.RequestVote_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.dynamic_node_id.server.RequestVote_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.enumeration.Begin_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.enumeration.Begin_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.enumeration.Indication.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.BeginFirmwareUpdate_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.BeginFirmwareUpdate_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.Delete_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.Delete_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.EntryType.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.Error.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.GetDirectoryEntryInfo_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.GetDirectoryEntryInfo_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.GetInfo_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.GetInfo_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.Path.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.Read_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.Read_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.Write_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.file.Write_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.param.Empty.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.param.ExecuteOpcode_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.param.ExecuteOpcode_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.param.GetSet_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.param.GetSet_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.param.NumericValue.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.protocol.param.Value.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.tunnel.Broadcast.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.tunnel.Call_req.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.tunnel.Call_res.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.tunnel.Protocol.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.tunnel.SerialConfig.c",
+				"/home/aleks/Documents/GO_DARPA/Test_CODE_receive/generated/src/uavcan.tunnel.Targetted.c"
+			],
+			"recurse" : true
+		}
+	],
+	"inputs" : 
+	[
+		{
+			"path" : "CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/pico-vscode.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/pico-vscode.cmake"
+		},
+		{
+			"path" : "pico_sdk_import.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/pico_sdk_init.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/pico_sdk_version.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/pico_utils.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/pico_pre_load_platform.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/generic_board.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/preload/platforms/rp2040.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/pico_pre_load_toolchain.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/CMakeFiles/3.31.5/CMakeSystem.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/preload/toolchains/pico_arm_cortex_m0plus_gcc.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/preload/toolchains/util/pico_arm_gcc_common.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/preload/toolchains/util/find_compiler.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/preload/toolchains/util/set_flags.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeSystemSpecificInitialize.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/CMakeFiles/3.31.5/CMakeCCompiler.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/CMakeFiles/3.31.5/CMakeCXXCompiler.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/CMakeFiles/3.31.5/CMakeASMCompiler.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeSystemSpecificInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeGenericSystem.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeInitializeConfigs.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/Platform/PICO.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Platform/UnixPaths.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeCInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeLanguageInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/GNU-C.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/CMakeCommonCompilerMacros.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/Platform/PICO.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Platform/UnixPaths.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeCommonLanguageInclude.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Internal/CMakeCLinkerInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Internal/CMakeCommonLinkerInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeCXXInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeLanguageInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/GNU-CXX.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/cmake/Platform/PICO.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Platform/UnixPaths.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeCommonLanguageInclude.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Internal/CMakeCXXLinkerInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Internal/CMakeCommonLinkerInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeASMInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/GNU-ASM.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Internal/CMakeASMLinkerInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/FetchContent.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/ExternalProject/shared_internal_commands.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/picotool/2.2.0-a4/picotool/picotoolConfigVersion.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/picotool/2.2.0-a4/picotool/picotoolConfig.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/picotool/2.2.0-a4/picotool/picotoolTargets.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/picotool/2.2.0-a4/picotool/picotoolTargets-release.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/pico_sdk_init.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeASMInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/GNU-ASM.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_base_headers/generate_config_header.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_base_headers/include/pico/version.h.in"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/tools/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2040.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/cmake/rp2_common.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/cmake/on_device.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakeASMInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/GNU-ASM.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2040/hardware_regs/include/hardware/regs/dreq.h"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2040/hardware_regs/include/hardware/regs/intctrl.h"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/boot_picobin_headers/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/boot_picoboot_headers/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/boot_uf2_headers/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_base_headers/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_usb_reset_interface_headers/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_bit_ops_headers/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_binary_info/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_divider_headers/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_sync/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_time/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_util/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/pico_stdlib_headers/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/common/hardware_claim/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2040/pico_platform/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2040/hardware_regs/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2040/hardware_structs/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2040/boot_stage2/CMakeLists.txt"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/FindPython3.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/FindPython/Support.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_base/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_adc/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_boot_lock/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_clocks/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_divider/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_dma/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_exception/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_flash/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_gpio/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_i2c/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_interp/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_irq/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_pio/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_pll/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_pwm/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_resets/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_rtc/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_spi/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_sync/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_sync_spin_lock/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_ticks/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_timer/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_uart/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_vreg/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_watchdog/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_xip_cache/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/hardware_xosc/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/boot_bootrom_headers/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_platform_common/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_platform_compiler/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_platform_sections/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_platform_panic/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_aon_timer/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_bootrom/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_bootsel_via_double_reset/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_multicore/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_unique_id/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_atomic/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_bit_ops/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_divider/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_double/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_int64_ops/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_flash/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_float/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_mem_ops/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_malloc/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_printf/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_rand/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_stdio_semihosting/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_stdio_uart/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_stdio_rtt/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/cmsis/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/tinyusb/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/lib/tinyusb/hw/bsp/family_support.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/CMakePrintHelpers.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/lib/tinyusb/hw/bsp/rp2040/family.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/lib/tinyusb/hw/bsp/rp2040/boards/pico_sdk/board.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/lib/tinyusb/hw/bsp/rp2040/pico_sdk_import.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/pico_sdk_init.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_stdio_usb/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_i2c_slave/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_async_context/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_btstack/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_cyw43_driver/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/tools/2.2.0/pioasm/pioasmConfigVersion.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/tools/2.2.0/pioasm/pioasmConfig.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/tools/2.2.0/pioasm/pioasmTargets.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/tools/2.2.0/pioasm/pioasmTargets-release.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_cyw43_driver/cybt_shared_bus/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_mbedtls/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_lwip/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_lwip/tools/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_cyw43_arch/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_time_adapter/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_crt0/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_clib_interface/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_cxx_options/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_standard_binary_info/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_standard_link/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_standard_link/pico_flash_region.template.ld"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_fix/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_fix/rp2040_usb_device_enumeration/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_status_led/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/tools/2.2.0/pioasm/pioasmConfigVersion.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/tools/2.2.0/pioasm/pioasmConfig.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/tools/2.2.0/pioasm/pioasmTargets.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/tools/2.2.0/pioasm/pioasmTargets-release.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_runtime_init/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_runtime/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_stdio/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/src/rp2_common/pico_stdlib/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/sdk/2.2.0/docs/CMakeLists.txt"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/FindDoxygen.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/home/aleks/.pico-sdk/cmake/v3.31.5/share/cmake-3.31/Modules/FindPackageMessage.cmake"
+		}
+	],
+	"kind" : "cmakeFiles",
+	"paths" : 
+	{
+		"build" : "/home/aleks/Documents/GO_DARPA/Test_CODE_receive/build",
+		"source" : "/home/aleks/Documents/GO_DARPA/Test_CODE_receive"
+	},
+	"version" : 
+	{
+		"major" : 1,
+		"minor" : 1
+	}
+}

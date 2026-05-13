@@ -1,0 +1,38 @@
+{
+  "calibration_sweep": {
+    "duration_s": "20",
+    "end_pct": "100",
+    "start_pct": "0"
+  },
+  "feedforward": {
+    "rpm_0_pct": "2200",
+    "rpm_100_pct": "4250",
+    "us_0_pct": "1850",
+    "us_100_pct": "1450"
+  },
+  "graph": {
+    "history_seconds": 45.0
+  },
+  "pid": {
+    "kd": "0.000",
+    "ki": "0.012",
+    "kp": "0.035",
+    "limit_us": "175"
+  },
+  "serial_port": "/dev/ttyACM0",
+  "square_wave": {
+    "maximum_pct": "35",
+    "minimum_pct": "15",
+    "period_s": "4"
+  },
+  "sweep": {
+    "duration_s": "12",
+    "end_pct": "100",
+    "start_pct": "0"
+  },
+  "telemetry_periods_ms": {
+    "a": "50",
+    "b": "100",
+    "c": "250"
+  }
+}
