@@ -823,13 +823,13 @@
           "group_by": false,
           "label": "Reference",
           "name": "Reference",
-          "show": false
+          "show": true
         },
         {
           "group_by": false,
           "label": "Qty",
           "name": "${QUANTITY}",
-          "show": true
+          "show": false
         },
         {
           "group_by": true,
@@ -1003,6 +1003,12 @@
           "group_by": false,
           "label": "DPN",
           "name": "DPN",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "JLC",
+          "name": "JLC",
           "show": true
         }
       ],
@@ -1061,7 +1067,7 @@
         "uuid": "8c0b3d8b-46d3-4173-ab1e-a61765f77d61"
       }
     ],
-    "used_designators": "#PWR47,TP3",
+    "used_designators": "",
     "variants": []
   },
   "sheets": [

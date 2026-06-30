@@ -1,0 +1,56 @@
+{
+  "calibration_sweep": {
+    "duration_s": "20",
+    "end_pct": "100",
+    "start_pct": "0"
+  },
+  "endpoint_auto_adjust": {
+    "all_board_dwell_s": "15",
+    "rate_us_per_s": "25",
+    "start_us": "1500"
+  },
+  "feedforward": {
+    "rpm_0_pct": "2100",
+    "rpm_100_pct": "5500",
+    "us_0_pct": "1926",
+    "us_100_pct": "1075"
+  },
+  "graph": {
+    "history_seconds": 45.0
+  },
+  "manual_pwm_test": {
+    "hold_ms": "10000"
+  },
+  "pid": {
+    "kd": "0.000",
+    "ki": "0.012",
+    "kp": "0.035",
+    "limit_us": "500"
+  },
+  "rpm_sensor": {
+    "auto_cal_duration_s": "0",
+    "auto_cal_target_rpm": "2200",
+    "threshold_high_raw": "215",
+    "threshold_low_raw": "83"
+  },
+  "serial_port": "/dev/ttyACM0",
+  "square_wave": {
+    "maximum_pct": "100",
+    "minimum_pct": "0",
+    "period_s": "4"
+  },
+  "startup": {
+    "hold_after_rpm_ms": "6000",
+    "start_us": "1650"
+  },
+  "sweep": {
+    "duration_s": "12",
+    "end_pct": "100",
+    "start_pct": "0"
+  },
+  "telemetry_periods_ms": {
+    "a": "10",
+    "b": "100",
+    "c": "250"
+  }
+}
