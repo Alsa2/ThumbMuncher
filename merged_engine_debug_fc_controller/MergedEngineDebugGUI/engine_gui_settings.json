@@ -10,10 +10,10 @@
     "start_us": "1500"
   },
   "feedforward": {
-    "rpm_0_pct": "2100",
-    "rpm_100_pct": "5500",
-    "us_0_pct": "1926",
-    "us_100_pct": "1075"
+    "rpm_0_pct": "1900",
+    "rpm_100_pct": "6300",
+    "us_0_pct": "1913",
+    "us_100_pct": "1000"
   },
   "graph": {
     "history_seconds": 45.0
@@ -22,16 +22,16 @@
     "hold_ms": "10000"
   },
   "pid": {
-    "kd": "0.000",
-    "ki": "0.012",
-    "kp": "0.035",
-    "limit_us": "500"
+    "kd": "0.0000000",
+    "ki": "0.012000000",
+    "kp": "0.035000000",
+    "limit_us": "200.00000"
   },
   "rpm_sensor": {
     "auto_cal_duration_s": "0",
     "auto_cal_target_rpm": "2200",
-    "threshold_high_raw": "215",
-    "threshold_low_raw": "83"
+    "threshold_high_raw": "575",
+    "threshold_low_raw": "324"
   },
   "serial_port": "/dev/ttyACM0",
   "square_wave": {
@@ -41,7 +41,7 @@
   },
   "startup": {
     "hold_after_rpm_ms": "6000",
-    "start_us": "1650"
+    "start_us": "1850"
   },
   "sweep": {
     "duration_s": "12",

@@ -131,6 +131,47 @@ static void stop_identify(void)
     g_start_beep_requested = false;
 }
 
+
+static void publish_config_snapshot(void)
+{
+    if (!g_selected) {
+        return;
+    }
+
+    EngineControlRuntimeConfig cfg;
+    engine_control_get_runtime_config(&cfg);
+    uint16_t high_raw = 0u;
+    uint16_t low_raw = 0u;
+    sensors_get_hall_thresholds_raw(&high_raw, &low_raw);
+
+    uint8_t data[8] = {0};
+    custom_can_float_store(&data[0], cfg.kp_us_per_rpm);
+    custom_can_float_store(&data[4], cfg.ki_us_per_rpm_s);
+    transmit_frame(CUSTOM_CAN_ID_CONFIG_PID_A, data, 8u);
+
+    memset(data, 0, sizeof(data));
+    custom_can_float_store(&data[0], cfg.kd_us_per_rpm_per_s);
+    custom_can_float_store(&data[4], cfg.correction_limit_us);
+    transmit_frame(CUSTOM_CAN_ID_CONFIG_PID_B, data, 8u);
+
+    memset(data, 0, sizeof(data));
+    custom_can_float_store(&data[0], cfg.idle_rpm);
+    custom_can_le16_store(&data[4], cfg.idle_us);
+    transmit_frame(CUSTOM_CAN_ID_CONFIG_FF_IDLE, data, 8u);
+
+    memset(data, 0, sizeof(data));
+    custom_can_float_store(&data[0], cfg.max_rpm);
+    custom_can_le16_store(&data[4], cfg.max_us);
+    transmit_frame(CUSTOM_CAN_ID_CONFIG_FF_MAX, data, 8u);
+
+    memset(data, 0, sizeof(data));
+    custom_can_le16_store(&data[0], cfg.start_us);
+    custom_can_le16_store(&data[2], cfg.start_hold_ms);
+    custom_can_le16_store(&data[4], high_raw);
+    custom_can_le16_store(&data[6], low_raw);
+    transmit_frame(CUSTOM_CAN_ID_CONFIG_MISC, data, 8u);
+}
+
 void custom_can_node_init(void)
 {
     EngineControlRuntimeConfig cfg;
@@ -271,6 +312,9 @@ void custom_can_node_handle_frame(const CanardCANFrame *frame, uint64_t timestam
         case CUSTOM_CAN_ACTION_STOP_IDENTIFY:
             stop_identify();
             break;
+        case CUSTOM_CAN_ACTION_GET_CONFIG:
+            publish_config_snapshot();
+            break;
         default:
             break;
         }
@@ -369,6 +413,19 @@ void custom_can_node_handle_frame(const CanardCANFrame *frame, uint64_t timestam
         const float target_rpm = custom_can_float_load(&frame->data[4]);
         if (!engine_control_start_hall_auto_cal(target_rpm, (uint32_t)duration_ms,
                                                 to_ms_since_boot(get_absolute_time()))) {
+            g_config_reject_count++;
+        }
+        return;
+    }
+
+    if (frame_id_is(frame, CUSTOM_CAN_ID_MANUAL_PWM_BYPASS) && frame->data_len >= 4u) {
+        mark_debug_seen(timestamp_usec);
+        if (!accepts_selected_command()) {
+            return;
+        }
+        const bool enable = (frame->data[0] & CUSTOM_CAN_MANUAL_PWM_BYPASS_ENABLE) != 0u;
+        const uint16_t throttle_us = custom_can_le16_load(&frame->data[2]);
+        if (!engine_control_set_manual_pwm_bypass(enable, throttle_us)) {
             g_config_reject_count++;
         }
         return;

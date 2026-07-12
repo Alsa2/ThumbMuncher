@@ -110,10 +110,10 @@
 #define ENDPOINT_AUTO_TUNE_DEFAULT_RATE_US_PER_S  25.0f
 #define ENDPOINT_AUTO_TUNE_DEADBAND_RPM           35.0f
 #define ENDPOINT_AUTO_TUNE_GAIN_US_PER_RPM_S      0.020f
-#define ENDPOINT_AUTO_TUNE_START_US               1500u
+#define ENDPOINT_AUTO_TUNE_START_US               1700u
 // This board's throttle opens as the servo PWM pulse gets smaller. Keep this
 // explicit instead of inferring direction from the current endpoints; auto-tune
-// deliberately starts both 0% and 100% searches near 1500 us, where endpoint
+// deliberately starts both 0% and 100% searches near 1700 us, where endpoint
 // ordering is not a reliable polarity signal. Use +1.0f on boards where a
 // larger PWM pulse increases RPM.
 #define ENDPOINT_AUTO_TUNE_RPM_UP_US_SIGN         (-1.0f)
@@ -253,7 +253,7 @@
 // -----------------------------------------------------------------------------
 // Direct manual throttle-PWM test used by the debug GUI. This replaces the old
 // servo sweep button; it powers the servo rail for a bounded time and commands
-// exactly the requested microsecond value. It never substitutes 1500 us.
+// exactly the requested microsecond value. It never substitutes a hard-coded fallback value.
 #define MANUAL_PWM_TEST_DEFAULT_HOLD_MS   10000u
 #define MANUAL_PWM_TEST_MAX_HOLD_MS       60000u
 

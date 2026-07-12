@@ -69,6 +69,12 @@ bool engine_control_request_manual_pwm_test(uint16_t throttle_us, uint32_t hold_
 bool engine_control_stop_manual_pwm_test(void);
 bool engine_control_manual_pwm_test_active(void);
 
+// Armed/running debug direct-throttle override. When enabled, the selected
+// board bypasses the feedforward curve and PID trim and drives throttle_us
+// directly while the normal armed state machine is running. Disarm disables it.
+bool engine_control_set_manual_pwm_bypass(bool enable, uint16_t throttle_us);
+bool engine_control_manual_pwm_bypass_active(void);
+
 // Runtime-configurable startup priming. start_us is used while waiting for RPM
 // and held for start_hold_ms after the first believable RPM.
 bool engine_control_set_start_config(uint16_t start_us, uint16_t start_hold_ms);

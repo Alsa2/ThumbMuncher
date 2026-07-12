@@ -159,6 +159,14 @@ static bool send_manual_pwm_stop(void)
     return tx_frame(CUSTOM_CAN_ID_MANUAL_PWM_TEST, data, 8u);
 }
 
+static bool send_manual_pwm_bypass(bool enable, uint16_t throttle_us)
+{
+    uint8_t data[8] = {0};
+    data[0] = enable ? CUSTOM_CAN_MANUAL_PWM_BYPASS_ENABLE : 0u;
+    custom_can_le16_store(&data[2], throttle_us);
+    return tx_frame(CUSTOM_CAN_ID_MANUAL_PWM_BYPASS, data, 8u);
+}
+
 static bool send_telemetry_rate(uint16_t telem_a_ms, uint16_t telem_b_ms, uint16_t telem_c_ms)
 {
     uint8_t data[8] = {0};
@@ -263,7 +271,7 @@ static void handle_line(char *line)
     }
 
     if (strcmp(cmd, "INFO") == 0) {
-        printf("INFO bridge=rp2040_usb_can_debug_probe protocol=custom_can_v2 bitrate=%u selected=%lu commands=PING,INFO,PROBE,SELECT,CLEAR_SELECT,CMD,ARM,THROTTLE,PID,FF0,FF100,STARTCFG,PWMTEST,PWMTEST_STOP,THRESH,HALLCAL,HALLCAL_STOP,RATE,IDENTIFY,STOP_IDENTIFY,SERVO_TEST,AUTO0,AUTO100,AUTO_STOP,SETID,PANIC_ALL\r\n",
+        printf("INFO bridge=rp2040_usb_can_debug_probe protocol=custom_can_v2 bitrate=%u selected=%lu commands=PING,INFO,PROBE,SELECT,CLEAR_SELECT,CMD,ARM,THROTTLE,PID,FF0,FF100,STARTCFG,PWMTEST,PWMTEST_STOP,PWMBYPASS,PWMBYPASS_STOP,THRESH,HALLCAL,HALLCAL_STOP,RATE,IDENTIFY,STOP_IDENTIFY,SERVO_TEST,AUTO0,AUTO100,AUTO_STOP,GETCFG,SETID,PANIC_ALL\r\n",
                CAN_BITRATE_HZ,
                (unsigned long)g_selected_id);
         return;
@@ -393,6 +401,23 @@ static void handle_line(char *line)
         return;
     }
 
+    if (strcmp(cmd, "PWMBYPASS") == 0 || strcmp(cmd, "PWM_BYPASS") == 0 || strcmp(cmd, "SERVO_BYPASS") == 0) {
+        unsigned int throttle_us = 0u;
+        if (sscanf(args, "%u", &throttle_us) == 1 && throttle_us <= 65535u) {
+            const bool ok_select = send_select_before_targeted_command();
+            print_ok_or_busy("PWMBYPASS", ok_select && send_manual_pwm_bypass(true, (uint16_t)throttle_us));
+        } else {
+            printf("ERR BAD_PWMBYPASS usage=PWMBYPASS <throttle_us>\r\n");
+        }
+        return;
+    }
+
+    if (strcmp(cmd, "PWMBYPASS_STOP") == 0 || strcmp(cmd, "PWM_BYPASS_STOP") == 0 || strcmp(cmd, "SERVO_BYPASS_STOP") == 0) {
+        const bool ok_select = send_select_before_targeted_command();
+        print_ok_or_busy("PWMBYPASS_STOP", ok_select && send_manual_pwm_bypass(false, 0u));
+        return;
+    }
+
     if (strcmp(cmd, "THRESH") == 0 || strcmp(cmd, "RPM_THRESH") == 0) {
         unsigned int high = 0u, low = 0u;
         if (sscanf(args, "%u %u", &high, &low) == 2 && high <= 4095u && low <= 4095u && high > low) {
@@ -460,6 +485,13 @@ static void handle_line(char *line)
         return;
     }
 
+    if (strcmp(cmd, "GETCFG") == 0 || strcmp(cmd, "GET_CONFIG") == 0 || strcmp(cmd, "CONFIG") == 0) {
+        const bool ok_select = send_select_before_targeted_command();
+        const bool ok_action = send_action(CUSTOM_CAN_ACTION_GET_CONFIG, false);
+        print_ok_or_busy("GETCFG", ok_select && ok_action);
+        return;
+    }
+
     if (strcmp(cmd, "AUTO0") == 0 || strcmp(cmd, "AUTO100") == 0) {
         float rpm = 0.0f;
         unsigned int rate = 25u;
@@ -468,7 +500,8 @@ static void handle_line(char *line)
             rate <= 65535u && start_us >= 500u && start_us <= 2500u) {
             const bool is_max = strcmp(cmd, "AUTO100") == 0;
             g_throttle_pct = is_max ? 100.0f : 0.0f;
-            print_ok_or_busy(cmd, send_auto_endpoint(is_max, true, rpm, (uint16_t)rate, (uint16_t)start_us, false));
+            const bool ok_select = send_select_before_targeted_command();
+            print_ok_or_busy(cmd, ok_select && send_auto_endpoint(is_max, true, rpm, (uint16_t)rate, (uint16_t)start_us, false));
             (void)send_selected_command_frame();
         } else {
             printf("ERR BAD_AUTO usage=%s <target_rpm> [rate_us_per_s] [start_us]\r\n", cmd);
@@ -477,14 +510,16 @@ static void handle_line(char *line)
     }
 
     if (strcmp(cmd, "AUTO_STOP") == 0) {
-        // Stop auto-tune/calibration, but do not clear ARM. The bridge-owned
-        // command heartbeat should immediately move the selected engine to 0%
-        // throttle while preserving whether it was armed.
+        // Stop auto-tune/calibration, but do not clear ARM. Re-select first so
+        // STOP_AUTO cannot accidentally land on a previously selected board.
+        // The bridge-owned command heartbeat then moves that selected engine to
+        // 0% throttle while preserving whether it was armed.
         g_throttle_pct = 0.0f;
-        const bool ok_action = send_action(CUSTOM_CAN_ACTION_STOP_AUTO, false);
-        const bool ok_hall = send_hall_auto_cal(false, 0.0f, 0u, true);
+        const bool ok_select = send_select_before_targeted_command();
+        const bool ok_action = ok_select && send_action(CUSTOM_CAN_ACTION_STOP_AUTO, false);
+        const bool ok_hall = ok_select && send_hall_auto_cal(false, 0.0f, 0u, true);
         const bool ok_cmd = send_selected_command_frame();
-        print_ok_or_busy("AUTO_STOP", ok_action && ok_hall && ok_cmd);
+        print_ok_or_busy("AUTO_STOP", ok_select && ok_action && ok_hall && ok_cmd);
         return;
     }
 
@@ -659,6 +694,50 @@ static void print_hall_cal_status(const CanFrame *frame)
            (unsigned long)g_selected_id);
 }
 
+
+static void print_config_pid_a(const CanFrame *frame)
+{
+    if (frame->data_len < 8u) return;
+    const float kp = custom_can_float_load(&frame->data[0]);
+    const float ki = custom_can_float_load(&frame->data[4]);
+    printf("CFG PID kp=%.8g ki=%.8g selected=%lu\r\n", (double)kp, (double)ki, (unsigned long)g_selected_id);
+}
+
+static void print_config_pid_b(const CanFrame *frame)
+{
+    if (frame->data_len < 8u) return;
+    const float kd = custom_can_float_load(&frame->data[0]);
+    const float limit = custom_can_float_load(&frame->data[4]);
+    printf("CFG PID2 kd=%.8g limit=%.8g selected=%lu\r\n", (double)kd, (double)limit, (unsigned long)g_selected_id);
+}
+
+static void print_config_ff_idle(const CanFrame *frame)
+{
+    if (frame->data_len < 6u) return;
+    const float rpm = custom_can_float_load(&frame->data[0]);
+    const uint16_t us = custom_can_le16_load(&frame->data[4]);
+    printf("CFG FF0 rpm=%.8g us=%u selected=%lu\r\n", (double)rpm, us, (unsigned long)g_selected_id);
+}
+
+static void print_config_ff_max(const CanFrame *frame)
+{
+    if (frame->data_len < 6u) return;
+    const float rpm = custom_can_float_load(&frame->data[0]);
+    const uint16_t us = custom_can_le16_load(&frame->data[4]);
+    printf("CFG FF100 rpm=%.8g us=%u selected=%lu\r\n", (double)rpm, us, (unsigned long)g_selected_id);
+}
+
+static void print_config_misc(const CanFrame *frame)
+{
+    if (frame->data_len < 8u) return;
+    const uint16_t start_us = custom_can_le16_load(&frame->data[0]);
+    const uint16_t hold_ms = custom_can_le16_load(&frame->data[2]);
+    const uint16_t high_raw = custom_can_le16_load(&frame->data[4]);
+    const uint16_t low_raw = custom_can_le16_load(&frame->data[6]);
+    printf("CFG MISC start_us=%u hold_ms=%u high_raw=%u low_raw=%u selected=%lu\r\n",
+           start_us, hold_ms, high_raw, low_raw, (unsigned long)g_selected_id);
+}
+
 static void poll_can(void)
 {
     CanFrame frame;
@@ -676,6 +755,16 @@ static void poll_can(void)
             print_auto_status(&frame);
         } else if (frame_id_is(&frame, CUSTOM_CAN_ID_HALL_CAL_STATUS)) {
             print_hall_cal_status(&frame);
+        } else if (frame_id_is(&frame, CUSTOM_CAN_ID_CONFIG_PID_A)) {
+            print_config_pid_a(&frame);
+        } else if (frame_id_is(&frame, CUSTOM_CAN_ID_CONFIG_PID_B)) {
+            print_config_pid_b(&frame);
+        } else if (frame_id_is(&frame, CUSTOM_CAN_ID_CONFIG_FF_IDLE)) {
+            print_config_ff_idle(&frame);
+        } else if (frame_id_is(&frame, CUSTOM_CAN_ID_CONFIG_FF_MAX)) {
+            print_config_ff_max(&frame);
+        } else if (frame_id_is(&frame, CUSTOM_CAN_ID_CONFIG_MISC)) {
+            print_config_misc(&frame);
         }
 #if BRIDGE_PRINT_RX_RAW
         else {
@@ -691,7 +780,7 @@ int main(void)
     sleep_ms(1200);
 
     printf("BRIDGE READY custom_can_v2\r\n");
-    printf("INFO commands=PING,INFO,PROBE,SCAN,SELECT,CLEAR_SELECT,CMD,ARM,THROTTLE,PID,FF0,FF100,STARTCFG,PWMTEST,PWMTEST_STOP,THRESH,HALLCAL,HALLCAL_STOP,RATE,IDENTIFY,BLINK,STOP_IDENTIFY,SERVO_TEST,AUTO0,AUTO100,AUTO_STOP,SETID,PANIC_ALL\r\n");
+    printf("INFO commands=PING,INFO,PROBE,SCAN,SELECT,CLEAR_SELECT,CMD,ARM,THROTTLE,PID,FF0,FF100,STARTCFG,PWMTEST,PWMTEST_STOP,PWMBYPASS,PWMBYPASS_STOP,THRESH,HALLCAL,HALLCAL_STOP,RATE,IDENTIFY,BLINK,STOP_IDENTIFY,SERVO_TEST,AUTO0,AUTO100,AUTO_STOP,GETCFG,SETID,PANIC_ALL\r\n");
 
     if (!mcp2518fd_init()) {
         printf("ERR MCP2518FD_INIT_FAILED\r\n");

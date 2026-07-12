@@ -159,6 +159,7 @@ int main(void)
             (void)engine_control_stop_endpoint_auto();
             (void)engine_control_stop_hall_auto_cal();
             (void)engine_control_stop_manual_pwm_test();
+            (void)engine_control_set_manual_pwm_bypass(false, 0u);
         }
         debug_was_alive = debug_alive;
 
@@ -182,6 +183,7 @@ int main(void)
             (void)engine_control_stop_endpoint_auto();
             (void)engine_control_stop_hall_auto_cal();
             (void)engine_control_stop_manual_pwm_test();
+            (void)engine_control_set_manual_pwm_bypass(false, 0u);
         }
 
         if (custom_can_node_consume_servo_test_request()) {

@@ -23,6 +23,8 @@ typedef struct {
     uint32_t last_spin_ms;
     uint16_t manual_pwm_us;
     uint32_t manual_pwm_hold_ms;
+    bool manual_pwm_bypass_active;
+    uint16_t manual_pwm_bypass_us;
 } EngineControl;
 
 static EngineControl g_ctrl;
@@ -169,7 +171,7 @@ static void set_throttle_idle(void)
 static void set_throttle_start(void)
 {
     // Use the exact runtime/FRAM-configured startup PWM. Do not fall back to
-    // a neutral 1500 us value here; the whole point is to make startup opening
+    // a fixed neutral-ish value here; the whole point is to make startup opening
     // board-configurable and reproducible.
     g_ctrl.target_rpm = 0.0f;
     g_ctrl.feedforward_us = (float)g_cfg.start_us;
@@ -203,6 +205,18 @@ static uint16_t apply_feedforward_pid(float cmd_pct, float measured_rpm, float d
 }
 
 
+static uint16_t apply_manual_pwm_bypass(void)
+{
+    const uint16_t us = clamp_servo_us_runtime(g_ctrl.manual_pwm_bypass_us);
+    g_ctrl.target_rpm = 0.0f;
+    g_ctrl.feedforward_us = (float)us;
+    g_ctrl.pid_correction_us = 0.0f;
+    g_ctrl.output_us = us;
+    actuators_set_throttle_us(g_ctrl.output_us);
+    return g_ctrl.output_us;
+}
+
+
 static uint16_t *auto_endpoint_us_ptr(void)
 {
     return g_auto.endpoint_is_max ? &g_cfg.max_us : &g_cfg.idle_us;
@@ -220,7 +234,7 @@ static uint16_t apply_endpoint_auto(float measured_rpm, float dt_s)
     g_auto.last_error_rpm = error;
 
     // Do not infer servo polarity from idle_us/max_us. During auto-tune we may
-    // intentionally start both endpoints from 1500 us, and the two stored
+    // intentionally start both endpoints from the requested start PWM, and the two stored
     // endpoints may temporarily cross. This board opens throttle as PWM gets
     // smaller, so positive RPM error must drive PWM down.
     float delta_us = 0.0f;
@@ -443,6 +457,8 @@ void engine_control_init(void)
     g_ctrl.last_spin_ms = 0u;
     g_ctrl.manual_pwm_us = g_cfg.idle_us;
     g_ctrl.manual_pwm_hold_ms = MANUAL_PWM_TEST_DEFAULT_HOLD_MS;
+    g_ctrl.manual_pwm_bypass_active = false;
+    g_ctrl.manual_pwm_bypass_us = g_cfg.idle_us;
 
     g_auto.active = false;
     g_auto.endpoint_is_max = false;
@@ -577,7 +593,7 @@ bool engine_control_start_endpoint_auto(bool endpoint_is_max,
 
     // Target RPM is read from the saved/user GUI field and must remain fixed.
     // Auto-tune changes only the endpoint PWM. Start both 0% and 100% searches
-    // from a known neutral-ish opening, normally 1500 us, so a bad old endpoint
+    // from a known neutral-ish opening, normally 1700 us, so a bad old endpoint
     // does not poison the search.
     g_auto.active = true;
     g_auto.endpoint_is_max = endpoint_is_max;
@@ -653,6 +669,7 @@ bool engine_control_request_servo_test(uint32_t now_ms)
     }
 
     (void)engine_control_stop_endpoint_auto();
+    g_ctrl.manual_pwm_bypass_active = false;
     pid_reset(&g_pid);
     g_ctrl.cmd_pct = 0.0f;
     g_ctrl.target_rpm = 0.0f;
@@ -690,6 +707,7 @@ bool engine_control_request_manual_pwm_test(uint16_t throttle_us, uint32_t hold_
     }
 
     (void)engine_control_stop_endpoint_auto();
+    g_ctrl.manual_pwm_bypass_active = false;
     pid_reset(&g_pid);
     g_ctrl.cmd_pct = 0.0f;
     g_ctrl.target_rpm = 0.0f;
@@ -723,6 +741,8 @@ bool engine_control_stop_manual_pwm_test(void)
     g_ctrl.output_us = g_cfg.idle_us;
     g_ctrl.manual_pwm_us = g_cfg.idle_us;
     g_ctrl.manual_pwm_hold_ms = MANUAL_PWM_TEST_DEFAULT_HOLD_MS;
+    g_ctrl.manual_pwm_bypass_active = false;
+    g_ctrl.manual_pwm_bypass_us = g_cfg.idle_us;
     enter_state(ENGINE_DISARMED, g_ctrl.last_update_ms);
     return true;
 }
@@ -730,6 +750,32 @@ bool engine_control_stop_manual_pwm_test(void)
 bool engine_control_manual_pwm_test_active(void)
 {
     return g_ctrl.state == ENGINE_MANUAL_PWM_TEST;
+}
+
+bool engine_control_set_manual_pwm_bypass(bool enable, uint16_t throttle_us)
+{
+    if (!enable) {
+        const bool was_active = g_ctrl.manual_pwm_bypass_active;
+        g_ctrl.manual_pwm_bypass_active = false;
+        g_ctrl.manual_pwm_bypass_us = g_cfg.idle_us;
+        pid_reset(&g_pid);
+        return was_active;
+    }
+
+    if (throttle_us < SERVO_US_HARD_MIN || throttle_us > SERVO_US_HARD_MAX) {
+        return false;
+    }
+
+    g_ctrl.manual_pwm_bypass_active = true;
+    g_ctrl.manual_pwm_bypass_us = clamp_servo_us_runtime(throttle_us);
+    (void)engine_control_stop_endpoint_auto();
+    pid_reset(&g_pid);
+    return true;
+}
+
+bool engine_control_manual_pwm_bypass_active(void)
+{
+    return g_ctrl.manual_pwm_bypass_active;
 }
 
 bool engine_control_start_hall_auto_cal(float target_rpm, uint32_t duration_ms, uint32_t now_ms)
@@ -742,6 +788,7 @@ bool engine_control_start_hall_auto_cal(float target_rpm, uint32_t duration_ms, 
     }
 
     (void)engine_control_stop_endpoint_auto();
+    g_ctrl.manual_pwm_bypass_active = false;
     pid_reset(&g_pid);
     g_ctrl.armed = true;
     g_ctrl.cmd_pct = 0.0f;
@@ -861,6 +908,8 @@ void engine_control_update(uint32_t now_ms)
         g_ctrl.last_spin_ms = 0u;
         g_ctrl.manual_pwm_us = g_cfg.idle_us;
         g_ctrl.manual_pwm_hold_ms = MANUAL_PWM_TEST_DEFAULT_HOLD_MS;
+        g_ctrl.manual_pwm_bypass_active = false;
+        g_ctrl.manual_pwm_bypass_us = g_cfg.idle_us;
         enter_state(ENGINE_DISARMED, now_ms);
         return;
     }
@@ -915,7 +964,9 @@ void engine_control_update(uint32_t now_ms)
 
         // Hold idle after priming until the incoming CAN throttle command is actually zero.
         if (s.rpm >= RPM_DETECT_THRESHOLD) {
-            if (g_auto.active) {
+            if (g_ctrl.manual_pwm_bypass_active) {
+                (void)apply_manual_pwm_bypass();
+            } else if (g_auto.active) {
                 (void)apply_endpoint_auto(s.rpm, dt_s);
             } else {
                 (void)apply_feedforward_pid(0.0f, s.rpm, dt_s);
@@ -941,7 +992,9 @@ void engine_control_update(uint32_t now_ms)
         }
 
         if (s.rpm >= RPM_DETECT_THRESHOLD) {
-            if (g_auto.active) {
+            if (g_ctrl.manual_pwm_bypass_active) {
+                (void)apply_manual_pwm_bypass();
+            } else if (g_auto.active) {
                 (void)apply_endpoint_auto(s.rpm, dt_s);
             } else {
                 (void)apply_feedforward_pid(g_ctrl.cmd_pct, s.rpm, dt_s);

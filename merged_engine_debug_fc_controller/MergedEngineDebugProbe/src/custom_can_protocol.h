@@ -13,6 +13,7 @@
 #define CUSTOM_CAN_ID_AUTO_ENDPOINT    0x1CEB0006u
 #define CUSTOM_CAN_ID_HALL_AUTO_CAL    0x1CEB0007u
 #define CUSTOM_CAN_ID_AUTO_ENDPOINT_EX 0x1CEB0008u
+#define CUSTOM_CAN_ID_MANUAL_PWM_BYPASS 0x1CEB0009u
 
 #define CUSTOM_CAN_ID_PID_KP_KI        0x1CEB0010u
 #define CUSTOM_CAN_ID_PID_KD_LIMIT     0x1CEB0011u
@@ -29,6 +30,11 @@
 #define CUSTOM_CAN_ID_BOARD_ANNOUNCE   0x1CEB0110u
 #define CUSTOM_CAN_ID_AUTO_STATUS      0x1CEB0111u
 #define CUSTOM_CAN_ID_HALL_CAL_STATUS  0x1CEB0112u
+#define CUSTOM_CAN_ID_CONFIG_PID_A      0x1CEB0113u
+#define CUSTOM_CAN_ID_CONFIG_PID_B      0x1CEB0114u
+#define CUSTOM_CAN_ID_CONFIG_FF_IDLE    0x1CEB0115u
+#define CUSTOM_CAN_ID_CONFIG_FF_MAX     0x1CEB0116u
+#define CUSTOM_CAN_ID_CONFIG_MISC       0x1CEB0117u
 
 #define CUSTOM_CAN_BROADCAST_BOARD_ID  0xFFFFFFFFu
 
@@ -56,6 +62,7 @@
 #define CUSTOM_CAN_ACTION_START_BEEP    4u  // pre-startup audible identify
 #define CUSTOM_CAN_ACTION_GLOBAL_DISARM 5u  // force debug command to disarmed/0%
 #define CUSTOM_CAN_ACTION_STOP_IDENTIFY 6u // stop temporary blink/beep identify pattern
+#define CUSTOM_CAN_ACTION_GET_CONFIG    7u // selected board publishes runtime/FRAM config frames
 #define CUSTOM_CAN_ACTION_FLAG_GLOBAL   0x01u
 
 // SET_BOARD_ID payload, 8 bytes:
@@ -91,12 +98,12 @@
 //   byte 2..3: maximum adjustment rate in servo microseconds/second
 //   byte 4..5: target RPM as uint16. This is the fixed desired RPM; auto-tune
 //              must never replace it with measured RPM.
-//   byte 6..7: starting servo PWM in microseconds, usually 1500.
+//   byte 6..7: starting servo PWM in microseconds, usually 1700.
 #define CUSTOM_CAN_AUTO_ENDPOINT_IDLE   0u
 #define CUSTOM_CAN_AUTO_ENDPOINT_MAX    1u
 #define CUSTOM_CAN_AUTO_ENDPOINT_ENABLE 0x01u
 #define CUSTOM_CAN_AUTO_ENDPOINT_GLOBAL 0x02u
-#define CUSTOM_CAN_AUTO_ENDPOINT_DEFAULT_START_US 1500u
+#define CUSTOM_CAN_AUTO_ENDPOINT_DEFAULT_START_US 1700u
 
 // HALL_AUTO_CAL payload, 8 bytes:
 //   byte 0: flags bit0 = enable, bit1 = selected-only bypass/global
@@ -106,6 +113,13 @@
 //              validate clean edge timing while thresholds are learned from raw ADC.
 #define CUSTOM_CAN_HALL_CAL_ENABLE     0x01u
 #define CUSTOM_CAN_HALL_CAL_GLOBAL     0x02u
+
+// MANUAL_PWM_BYPASS payload, 8 bytes. Selected-board debug override only.
+//   byte 0: flags bit0 = enable direct throttle PWM override
+//   byte 1: reserved
+//   byte 2..3: exact throttle PWM in microseconds
+//   byte 4..7: reserved
+#define CUSTOM_CAN_MANUAL_PWM_BYPASS_ENABLE 0x01u
 
 // HALL_CAL_STATUS payload, 8 bytes:
 //   byte 0: status 0=idle, 1=running, 2=done_ok, 3=failed/aborted

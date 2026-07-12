@@ -194,12 +194,16 @@ class EngineGui(tk.Tk):
         self.auto_status = tk.StringVar(value="Endpoint servo auto-adjust idle")
         self.endpoint_auto_rate_var = tk.StringVar(value="25")
         self.endpoint_auto_duration_var = tk.StringVar(value="15")
-        self.endpoint_auto_start_us_var = tk.StringVar(value="1500")
+        self.endpoint_auto_start_us_var = tk.StringVar(value="1700")
         self.all_cal_active = False
         self.all_cal_queue: list[int] = []
         self.all_cal_endpoint_label = ""
         self.all_cal_phase = "idle"
         self.all_cal_phase_deadline = 0.0
+        self.selected_autocal_active = False
+        self.selected_autocal_board_id: Optional[int] = None
+        self.selected_autocal_phase = "idle"
+        self.selected_autocal_phase_deadline = 0.0
 
         self.command_armed = False
         self.manual_throttle = tk.DoubleVar(value=0.0)
@@ -385,7 +389,7 @@ class EngineGui(tk.Tk):
     def _build_tuning_box(self, parent: ttk.Frame) -> None:
         box = ttk.LabelFrame(parent, text="PID + feedforward tuning", padding=10)
         box.pack(fill="x", pady=(0, 10))
-        for col in range(4):
+        for col in range(6):
             box.columnconfigure(col, weight=1)
 
         self.kp_var = tk.StringVar(value="0.035")
@@ -399,60 +403,50 @@ class EngineGui(tk.Tk):
         self.start_us_var = tk.StringVar(value="1400")
         self.start_hold_ms_var = tk.StringVar(value="1000")
         self.manual_pwm_hold_ms_var = tk.StringVar(value="10000")
+        self.manual_pwm_bypass_var = tk.BooleanVar(value=False)
+        self.manual_pwm_slider_us_var = tk.DoubleVar(value=1700.0)
+        self.manual_pwm_slider_label = tk.StringVar(value="1700 us")
+        self.last_manual_pwm_slider_send = 0.0
         self.hall_high_raw_var = tk.StringVar(value="215")
         self.hall_low_raw_var = tk.StringVar(value="83")
 
+        ttk.Button(box, text="Get configs from selected motor", command=self.get_configs_selected_motor).grid(row=0, column=0, columnspan=6, sticky="ew", pady=(0, 8))
+
         fields = [
-            ("Kp", self.kp_var), ("Ki", self.ki_var),
-            ("Kd", self.kd_var), ("PID limit us", self.limit_var),
-            ("0% RPM", self.ff0_rpm_var), ("0% us", self.ff0_us_var),
-            ("100% RPM", self.ff100_rpm_var), ("100% us", self.ff100_us_var),
-            ("Start us", self.start_us_var), ("Start hold ms", self.start_hold_ms_var),
-            ("RPM high raw", self.hall_high_raw_var), ("RPM low raw", self.hall_low_raw_var),
+            ("Kp", self.kp_var, "kp"), ("Ki", self.ki_var, "ki"),
+            ("Kd", self.kd_var, "kd"), ("PID limit us", self.limit_var, "limit"),
+            ("0% RPM", self.ff0_rpm_var, "ff0_rpm"), ("0% us", self.ff0_us_var, "ff0_us"),
+            ("100% RPM", self.ff100_rpm_var, "ff100_rpm"), ("100% us", self.ff100_us_var, "ff100_us"),
+            ("Start us", self.start_us_var, "start_us"), ("Start hold ms", self.start_hold_ms_var, "start_hold_ms"),
+            ("RPM high raw", self.hall_high_raw_var, "hall_high"), ("RPM low raw", self.hall_low_raw_var, "hall_low"),
         ]
-        for i, (label, var) in enumerate(fields):
-            r = (i // 2) * 2
-            c = (i % 2) * 2
-            ttk.Label(box, text=label).grid(row=r, column=c, sticky="w", padx=(0, 5), pady=(0, 2))
-            ttk.Entry(box, textvariable=var, width=12).grid(row=r + 1, column=c, columnspan=2, sticky="ew", padx=(0, 7), pady=(0, 6))
+        for i, (label, var, key) in enumerate(fields):
+            r = 1 + (i // 2) * 2
+            c = 0 if (i % 2) == 0 else 3
+            ttk.Label(box, text=label).grid(row=r, column=c, columnspan=2, sticky="w", padx=(0, 5), pady=(0, 2))
+            ttk.Entry(box, textvariable=var, width=12).grid(row=r + 1, column=c, sticky="ew", padx=(0, 5), pady=(0, 6))
+            ttk.Button(box, text="Send to motor", command=lambda k=key: self.send_config_field(k)).grid(row=r + 1, column=c + 1, columnspan=2, sticky="ew", padx=(0, 7), pady=(0, 6))
 
-        ttk.Button(box, text="Apply all tuning values (FRAM: used by FC + debug)", command=self.apply_tuning).grid(row=12, column=0, columnspan=4, sticky="ew", pady=(4, 0))
-        ttk.Button(box, text="Apply RPM sensor thresholds only", command=self.apply_rpm_thresholds).grid(row=13, column=0, columnspan=4, sticky="ew", pady=(6, 0))
+        base = 14
+        ttk.Button(box, text="Apply all tuning values (FRAM: used by FC + debug)", command=self.apply_tuning).grid(row=base, column=0, columnspan=6, sticky="ew", pady=(4, 0))
+        ttk.Button(box, text="Apply RPM sensor thresholds only", command=self.apply_rpm_thresholds).grid(row=base + 1, column=0, columnspan=6, sticky="ew", pady=(6, 0))
 
-        ttk.Label(box, text="Hall auto-cal target RPM (runs until clean)").grid(row=14, column=0, columnspan=4, sticky="w", pady=(8, 0))
-        ttk.Entry(box, textvariable=self.hall_cal_target_rpm_var, width=8).grid(row=15, column=0, sticky="ew", padx=(0, 6))
-        ttk.Button(box, text="Auto-cal Hall min/max at spinner RPM", command=self.start_hall_auto_cal).grid(row=15, column=1, columnspan=3, sticky="ew", pady=(0, 0))
-        ttk.Button(box, text="Stop Hall auto-cal", command=self.stop_hall_auto_cal).grid(row=16, column=0, columnspan=4, sticky="ew", pady=(6, 0))
-        ttk.Label(box, textvariable=self.hall_auto_cal_status, wraplength=330).grid(row=17, column=0, columnspan=4, sticky="w", pady=(6, 0))
+        ttk.Label(box, text="Hall auto-cal target RPM (runs until clean)").grid(row=base + 2, column=0, columnspan=6, sticky="w", pady=(8, 0))
+        ttk.Entry(box, textvariable=self.hall_cal_target_rpm_var, width=8).grid(row=base + 3, column=0, sticky="ew", padx=(0, 6))
+        ttk.Button(box, text="Auto-cal Hall min/max at spinner RPM", command=self.start_hall_auto_cal).grid(row=base + 3, column=1, columnspan=5, sticky="ew", pady=(0, 0))
+        ttk.Button(box, text="Stop Hall auto-cal", command=self.stop_hall_auto_cal).grid(row=base + 4, column=0, columnspan=6, sticky="ew", pady=(6, 0))
+        ttk.Label(box, textvariable=self.hall_auto_cal_status, wraplength=600).grid(row=base + 5, column=0, columnspan=6, sticky="w", pady=(6, 0))
 
-        ttk.Button(
-            box,
-            text="Auto-set 0% RPM: command idle opening + average 10 s",
-            command=lambda: self.start_endpoint_average("0%"),
-        ).grid(row=18, column=0, columnspan=4, sticky="ew", pady=(8, 0))
-        ttk.Button(
-            box,
-            text="Auto-set 100% RPM: command full opening + average 10 s",
-            command=lambda: self.start_endpoint_average("100%"),
-        ).grid(row=19, column=0, columnspan=4, sticky="ew", pady=(6, 0))
-        ttk.Button(
-            box,
-            text="Cancel endpoint average → 0% throttle",
-            command=lambda: self.cancel_endpoint_average(zero_throttle=True),
-        ).grid(row=20, column=0, columnspan=4, sticky="ew", pady=(6, 0))
-        ttk.Label(box, text="Auto-adjust rate (us/s) / all-board dwell (s) / start PWM us").grid(row=21, column=0, columnspan=4, sticky="w", pady=(8, 0))
-        ttk.Entry(box, textvariable=self.endpoint_auto_rate_var, width=8).grid(row=22, column=0, sticky="ew", padx=(0, 6))
-        ttk.Entry(box, textvariable=self.endpoint_auto_duration_var, width=8).grid(row=22, column=1, sticky="ew", padx=(0, 6))
-        ttk.Entry(box, textvariable=self.endpoint_auto_start_us_var, width=8).grid(row=22, column=2, sticky="ew", padx=(0, 6))
-        ttk.Button(box, text="Auto-adjust selected 0% us to 0% RPM", command=lambda: self.start_endpoint_auto_adjust("0%")).grid(row=23, column=0, columnspan=4, sticky="ew", pady=(6, 0))
-        ttk.Button(box, text="Auto-adjust selected 100% us to 100% RPM", command=lambda: self.start_endpoint_auto_adjust("100%")).grid(row=24, column=0, columnspan=4, sticky="ew", pady=(6, 0))
-        ttk.Button(box, text="Stop endpoint auto-adjust", command=self.stop_endpoint_auto_adjust).grid(row=25, column=0, columnspan=4, sticky="ew", pady=(6, 0))
-        ttk.Button(box, text="Auto-adjust ALL 0% clockwise", command=lambda: self.start_all_boards_endpoint_auto("0%")).grid(row=26, column=0, columnspan=2, sticky="ew", pady=(6, 0), padx=(0, 4))
-        ttk.Button(box, text="Auto-adjust ALL 100% clockwise", command=lambda: self.start_all_boards_endpoint_auto("100%")).grid(row=26, column=2, columnspan=2, sticky="ew", pady=(6, 0))
-        ttk.Label(box, textvariable=self.auto_status, wraplength=330).grid(row=27, column=0, columnspan=4, sticky="w", pady=(8, 0))
-        ttk.Label(box, textvariable=self.endpoint_average_status, wraplength=330).grid(row=28, column=0, columnspan=4, sticky="w", pady=(8, 0))
+        ttk.Label(box, text="Endpoint auto-adjust rate (us/s) / start PWM us").grid(row=base + 6, column=0, columnspan=6, sticky="w", pady=(8, 0))
+        ttk.Entry(box, textvariable=self.endpoint_auto_rate_var, width=8).grid(row=base + 7, column=0, sticky="ew", padx=(0, 6))
+        ttk.Entry(box, textvariable=self.endpoint_auto_start_us_var, width=8).grid(row=base + 7, column=1, sticky="ew", padx=(0, 6))
+        ttk.Button(box, text="Auto-adjust selected 0% us to 0% RPM", command=lambda: self.start_endpoint_auto_adjust("0%")).grid(row=base + 8, column=0, columnspan=6, sticky="ew", pady=(6, 0))
+        ttk.Button(box, text="Auto-adjust selected 100% us to 100% RPM", command=lambda: self.start_endpoint_auto_adjust("100%")).grid(row=base + 9, column=0, columnspan=6, sticky="ew", pady=(6, 0))
+        ttk.Button(box, text="Autocalibrate selected engine (2:00 warmup, 1:30 idle, 1:30 max)", command=self.start_selected_engine_autocalibrate).grid(row=base + 10, column=0, columnspan=6, sticky="ew", pady=(6, 0))
+        ttk.Button(box, text="Stop endpoint auto-adjust", command=self.stop_endpoint_auto_adjust).grid(row=base + 11, column=0, columnspan=6, sticky="ew", pady=(6, 0))
+        ttk.Label(box, textvariable=self.auto_status, wraplength=600).grid(row=base + 12, column=0, columnspan=6, sticky="w", pady=(8, 0))
         self.tuning_status = tk.StringVar(value="No tuning packet sent yet")
-        ttk.Label(box, textvariable=self.tuning_status, wraplength=330).grid(row=29, column=0, columnspan=4, sticky="w", pady=(8, 0))
+        ttk.Label(box, textvariable=self.tuning_status, wraplength=600).grid(row=base + 13, column=0, columnspan=6, sticky="w", pady=(8, 0))
 
     def _build_sweep_box(self, parent: ttk.Frame) -> None:
         box = ttk.LabelFrame(parent, text="Throttle sweep", padding=10)
@@ -646,6 +640,8 @@ class EngineGui(tk.Tk):
         self.all_cal_active = False
         self.all_cal_queue.clear()
         self.all_cal_phase = "idle"
+        self.selected_autocal_active = False
+        self.selected_autocal_phase = "idle"
         self.hall_auto_cal_active = False
         self.cancel_endpoint_average(silent=True, zero_throttle=False)
 
@@ -786,6 +782,8 @@ class EngineGui(tk.Tk):
                 self._set_config_field_if_idle(self.ff0_us_var, str(us), "0% throttle us")
             elif endpoint == "100%" and us:
                 self._set_config_field_if_idle(self.ff100_us_var, str(us), "100% throttle us")
+        elif line.startswith("CFG "):
+            self.parse_config_line(line[4:])
         elif line.startswith("HALLCAL "):
             self.parse_hall_cal_status_line(line[8:])
         elif line.startswith("OK PID"):
@@ -804,6 +802,12 @@ class EngineGui(tk.Tk):
             self.hall_auto_cal_status.set("Hall auto-cal command accepted; hold the external spinner at the target RPM")
         elif line.startswith("OK RATE"):
             self.rate_status.set("Bridge accepted live telemetry-rate CAN frame")
+        elif line.startswith("OK GETCFG"):
+            self.tuning_status.set("Config request accepted; waiting for selected motor CFG frames")
+        elif line.startswith("OK PWMBYPASS_STOP"):
+            self.board_status.set("Manual PWM bypass stopped on selected motor")
+        elif line.startswith("OK PWMBYPASS"):
+            self.board_status.set("Manual PWM bypass command accepted by bridge for selected motor")
 
     def parse_board_line(self, text: str) -> None:
         kv = self.parse_kv(text)
@@ -925,9 +929,9 @@ class EngineGui(tk.Tk):
         if not self.ensure_board_selected():
             return
         win = tk.Toplevel(self)
-        win.title("Direct throttle PWM test")
-        win.geometry("520x300")
-        win.minsize(460, 260)
+        win.title("Direct throttle PWM / bypass test")
+        win.geometry("560x470")
+        win.minsize(500, 430)
         win.transient(self)
         win.grab_set()
 
@@ -939,11 +943,10 @@ class EngineGui(tk.Tk):
         ttk.Label(
             frame,
             text=(
-                "This powers the relay/servo rail and commands the exact throttle PWM. "
-                "Starter stays off. The test stops automatically after the hold time, "
-                "or immediately if RPM is detected."
+                "Normal PWM test powers the relay/servo rail only while disarmed/stationary. "
+                "Bypass mode is selected-engine only and drives exact throttle PWM while the engine is armed/running, bypassing feedforward and PID."
             ),
-            wraplength=480,
+            wraplength=520,
         ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
 
         ttk.Label(frame, text="0% throttle us").grid(row=1, column=0, sticky="w")
@@ -957,22 +960,97 @@ class EngineGui(tk.Tk):
         ttk.Entry(frame, textvariable=self.manual_pwm_hold_ms_var, width=10).grid(row=4, column=0, sticky="ew", padx=(0, 6))
         ttk.Button(frame, text="Apply start config to FRAM", command=self.apply_start_config_only).grid(row=4, column=1, columnspan=2, sticky="ew")
 
-        ttk.Button(frame, text="Set to 0% PWM", command=lambda: self.send_manual_pwm_test_from_var(self.ff0_us_var)).grid(row=5, column=0, sticky="ew", pady=(12, 0), padx=(0, 6))
-        ttk.Button(frame, text="Set to 100% PWM", command=lambda: self.send_manual_pwm_test_from_var(self.ff100_us_var)).grid(row=5, column=1, sticky="ew", pady=(12, 0), padx=(0, 6))
-        ttk.Button(frame, text="Set to START PWM", command=lambda: self.send_manual_pwm_test_from_var(self.start_us_var)).grid(row=5, column=2, sticky="ew", pady=(12, 0))
-        ttk.Button(frame, text="Stop / safe disarm", command=lambda: self.stop_manual_pwm_test_popup(win)).grid(row=6, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        ttk.Checkbutton(
+            frame,
+            text="Bypass feedforward/PID for selected armed/running motor",
+            variable=self.manual_pwm_bypass_var,
+            command=self.manual_pwm_bypass_toggled,
+        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(12, 0))
+
+        ttk.Label(frame, text="Live bypass/manual PWM slider").grid(row=6, column=0, columnspan=2, sticky="w", pady=(12, 0))
+        ttk.Label(frame, textvariable=self.manual_pwm_slider_label, font=("TkDefaultFont", 11, "bold")).grid(row=6, column=2, sticky="e", pady=(12, 0))
+        ttk.Scale(
+            frame,
+            from_=2000.0,
+            to=1000.0,
+            variable=self.manual_pwm_slider_us_var,
+            command=self._manual_pwm_slider_changed,
+        ).grid(row=7, column=0, columnspan=3, sticky="ew", pady=(4, 0))
+        ttk.Button(frame, text="Send slider PWM now", command=lambda: self.send_manual_pwm_slider(live=False)).grid(row=8, column=0, columnspan=3, sticky="ew", pady=(8, 0))
+
+        ttk.Button(frame, text="Set to 0% PWM", command=lambda: self.send_manual_pwm_test_from_var(self.ff0_us_var)).grid(row=9, column=0, sticky="ew", pady=(12, 0), padx=(0, 6))
+        ttk.Button(frame, text="Set to 100% PWM", command=lambda: self.send_manual_pwm_test_from_var(self.ff100_us_var)).grid(row=9, column=1, sticky="ew", pady=(12, 0), padx=(0, 6))
+        ttk.Button(frame, text="Set to START PWM", command=lambda: self.send_manual_pwm_test_from_var(self.start_us_var)).grid(row=9, column=2, sticky="ew", pady=(12, 0))
+        ttk.Button(frame, text="Stop bypass only", command=self.stop_pwm_bypass).grid(row=10, column=0, columnspan=3, sticky="ew", pady=(12, 0))
+        ttk.Button(frame, text="Stop / safe disarm", command=lambda: self.stop_manual_pwm_test_popup(win)).grid(row=11, column=0, columnspan=3, sticky="ew", pady=(8, 0))
 
     def stop_manual_pwm_test_popup(self, win: tk.Toplevel) -> None:
+        self.send_line("PWMBYPASS_STOP")
         self.send_line("PWMTEST_STOP")
         self.send_line("CMD 0 0")
         self.command_armed = False
         self.manual_throttle.set(0.0)
         self._slider_changed()
-        self.board_status.set("Direct throttle PWM test stopped; safe disarm sent")
+        self.manual_pwm_bypass_var.set(False)
+        self.board_status.set("Direct throttle PWM/bypass stopped; safe disarm sent")
         try:
             win.destroy()
         except tk.TclError:
             pass
+
+    def _manual_pwm_slider_changed(self, _event: object = None) -> None:
+        us = int(round(float(self.manual_pwm_slider_us_var.get())))
+        self.manual_pwm_slider_label.set(f"{us} us")
+        if self.manual_pwm_bypass_var.get():
+            self.send_manual_pwm_slider(live=True)
+
+    def manual_pwm_bypass_toggled(self) -> None:
+        if self.manual_pwm_bypass_var.get():
+            self.send_manual_pwm_slider(live=False)
+        else:
+            self.stop_pwm_bypass()
+
+    def send_manual_pwm_slider(self, live: bool = False) -> None:
+        us = int(round(float(self.manual_pwm_slider_us_var.get())))
+        if not 1000 <= us <= 2000:
+            return
+        if self.manual_pwm_bypass_var.get():
+            self.send_pwm_bypass_us(us, live=live)
+        elif not live:
+            self.send_manual_pwm_test_us(us)
+
+    def send_pwm_bypass_us(self, pwm_us: int, live: bool = False) -> None:
+        if not self.ensure_board_selected():
+            return
+        if live:
+            now = time.monotonic()
+            if now - self.last_manual_pwm_slider_send < 0.08:
+                return
+            self.last_manual_pwm_slider_send = now
+        if self.selected_board_id is not None:
+            self.send_line(f"SELECT {self.selected_board_id}")
+        self.send_line(f"PWMBYPASS {pwm_us}")
+        self.board_status.set(f"Selected motor PWM bypass: {pwm_us} us; feedforward/PID bypassed while armed/running")
+
+    def stop_pwm_bypass(self) -> None:
+        self.manual_pwm_bypass_var.set(False)
+        if self.ensure_board_selected():
+            self.send_line("PWMBYPASS_STOP")
+            self.board_status.set("Selected motor PWM bypass stopped; normal feedforward/PID resumes")
+
+    def send_manual_pwm_test_us(self, pwm_us: int) -> None:
+        if not self.reselect_selected_board():
+            return
+        hold_ms = self._parse_manual_pwm_hold_ms_field()
+        if hold_ms is None:
+            return
+        self.command_armed = False
+        self._stop_gui_automated_flags()
+        self.send_line("CMD 0 0")
+        self.send_line("PWMTEST_STOP")
+        self.send_line(f"PWMTEST {pwm_us} {hold_ms}")
+        self.board_status.set(f"Direct throttle PWM test sent: {pwm_us} us for {hold_ms} ms. Starter stays off; aborts on RPM.")
+        self.save_settings(silent=True)
 
     def _parse_servo_us_field(self, var: tk.StringVar, label: str) -> Optional[int]:
         try:
@@ -1019,19 +1097,15 @@ class EngineGui(tk.Tk):
         self.save_settings(silent=True)
 
     def send_manual_pwm_test_from_var(self, var: tk.StringVar) -> None:
-        if not self.reselect_selected_board():
-            return
         pwm_us = self._parse_servo_us_field(var, "Throttle PWM")
-        hold_ms = self._parse_manual_pwm_hold_ms_field()
-        if pwm_us is None or hold_ms is None:
+        if pwm_us is None:
             return
-        self.command_armed = False
-        self._stop_gui_automated_flags()
-        self.send_line("CMD 0 0")
-        self.send_line("PWMTEST_STOP")
-        self.send_line(f"PWMTEST {pwm_us} {hold_ms}")
-        self.board_status.set(f"Direct throttle PWM test sent: {pwm_us} us for {hold_ms} ms. Starter stays off; aborts on RPM.")
-        self.save_settings(silent=True)
+        self.manual_pwm_slider_us_var.set(float(pwm_us))
+        self.manual_pwm_slider_label.set(f"{pwm_us} us")
+        if self.manual_pwm_bypass_var.get():
+            self.send_pwm_bypass_us(pwm_us, live=False)
+        else:
+            self.send_manual_pwm_test_us(pwm_us)
 
     def set_selected_board_id(self) -> None:
         if not self.ensure_board_selected():
@@ -1197,7 +1271,7 @@ class EngineGui(tk.Tk):
                 self.close_process_popup()
 
     def start_endpoint_auto_adjust(self, endpoint_label: str, show_popup: bool = True) -> None:
-        if not self.ensure_board_selected():
+        if not self.reselect_selected_board():
             return
         try:
             rate = int(float(self.endpoint_auto_rate_var.get()))
@@ -1210,7 +1284,7 @@ class EngineGui(tk.Tk):
             messagebox.showerror("Bad endpoint auto-adjust", "Rate should be 1..200 servo microseconds per second.")
             return
         if start_us < 1000 or start_us > 2000:
-            messagebox.showerror("Bad endpoint auto-adjust", "Start PWM should be inside the hard servo range, normally 1000..2000 us. Use 1500 us as the neutral search start.")
+            messagebox.showerror("Bad endpoint auto-adjust", "Start PWM should be inside the hard servo range, normally 1000..2000 us. Use 1700 us as the normal search start.")
             return
         self.sweep_active = False
         self.square_active = False
@@ -1235,7 +1309,7 @@ class EngineGui(tk.Tk):
                 f"Fixed target {target:.0f} RPM, starting from {start_us} us, max rate {rate} us/s. Press ABORT PROCESS to stop tuning and return to 0% throttle without disarming.",
             )
 
-    def stop_endpoint_auto_adjust(self) -> None:
+    def stop_endpoint_auto_adjust(self, close_popup: bool = True) -> None:
         # Stop the tuning loop only. Do not disarm; command the selected engine
         # to 0% throttle and preserve the current ARM state.
         self.send_line("AUTO_STOP")
@@ -1244,9 +1318,87 @@ class EngineGui(tk.Tk):
         self.send_current_command()
         self.after(80, self.send_current_command)
         self.after(180, self.send_current_command)
-        self.close_process_popup()
+        if close_popup:
+            self.close_process_popup()
         self.auto_status.set("Endpoint auto-adjust stopped; command moved to 0% throttle, ARM state preserved")
         self.command_status.set("Auto-adjust stopped: sending 0% throttle without disarming")
+
+    def start_selected_engine_autocalibrate(self) -> None:
+        if not self.reselect_selected_board():
+            return
+        if not self.serial_worker.is_connected():
+            messagebox.showerror("Bridge disconnected", "Connect the USB↔CAN bridge before autocalibrating.")
+            return
+        assert self.selected_board_id is not None
+        self.sweep_active = False
+        self.square_active = False
+        self.cal_sweep_active = False
+        self.all_cal_active = False
+        self.hall_auto_cal_active = False
+        self.cancel_endpoint_average(silent=True, zero_throttle=False)
+        self.send_line("HALLCAL_STOP")
+        self.send_line("AUTO_STOP")
+        self.command_armed = True
+        self.manual_throttle.set(0.0)
+        self._slider_changed()
+        self.send_current_command()
+        self.selected_autocal_active = True
+        self.selected_autocal_board_id = self.selected_board_id
+        self.selected_autocal_phase = "warmup"
+        self.selected_autocal_phase_deadline = time.monotonic() + 120.0
+        detail = "Phase 1/3: armed at 0% for 2:00 warmup. Then auto-adjust 0% for 1:30 and 100% for 1:30."
+        self.auto_status.set(detail)
+        self.command_status.set("Selected-engine autocalibration active; heartbeat remains armed")
+        self.show_process_popup("selected engine autocalibrate", detail)
+
+    def update_selected_engine_autocalibrate(self) -> None:
+        if not self.selected_autocal_active:
+            return
+        now = time.monotonic()
+        board_txt = f"Board {self.selected_autocal_board_id}" if self.selected_autocal_board_id is not None else "Selected board"
+
+        if self.selected_autocal_phase == "warmup":
+            self.command_armed = True
+            self.manual_throttle.set(0.0)
+            self._slider_changed()
+            remaining = max(self.selected_autocal_phase_deadline - now, 0.0)
+            detail = f"{board_txt}: warmup at 0% throttle, {remaining:0.0f} s remaining"
+            self.auto_status.set(detail)
+            self.update_process_popup(detail)
+            if now >= self.selected_autocal_phase_deadline:
+                self.start_endpoint_auto_adjust("0%", show_popup=False)
+                self.selected_autocal_phase = "auto0"
+                self.selected_autocal_phase_deadline = now + 90.0
+            return
+
+        if self.selected_autocal_phase == "auto0":
+            remaining = max(self.selected_autocal_phase_deadline - now, 0.0)
+            detail = f"{board_txt}: auto-adjusting 0% endpoint, {remaining:0.0f} s remaining"
+            self.auto_status.set(detail)
+            self.update_process_popup(detail)
+            if now >= self.selected_autocal_phase_deadline:
+                self.stop_endpoint_auto_adjust(close_popup=False)
+                self.start_endpoint_auto_adjust("100%", show_popup=False)
+                self.selected_autocal_phase = "auto100"
+                self.selected_autocal_phase_deadline = now + 90.0
+            return
+
+        if self.selected_autocal_phase == "auto100":
+            remaining = max(self.selected_autocal_phase_deadline - now, 0.0)
+            detail = f"{board_txt}: auto-adjusting 100% endpoint, {remaining:0.0f} s remaining"
+            self.auto_status.set(detail)
+            self.update_process_popup(detail)
+            if now >= self.selected_autocal_phase_deadline:
+                self.stop_endpoint_auto_adjust(close_popup=False)
+                self.command_armed = True
+                self.manual_throttle.set(0.0)
+                self._slider_changed()
+                self.send_current_command()
+                self.selected_autocal_active = False
+                self.selected_autocal_phase = "idle"
+                self.auto_status.set(f"{board_txt}: autocalibration complete; engine remains armed at 0% throttle")
+                self.command_status.set("Autocalibration complete: selected engine held at 0%, still armed for manual testing")
+                self.close_process_popup("selected engine autocalibrate")
 
     def start_all_boards_endpoint_auto(self, endpoint_label: str) -> None:
         live_ids = [bid for bid, b in sorted(self.boards.items()) if time.monotonic() - b.last_rx_monotonic < 3.0]
@@ -1394,6 +1546,8 @@ class EngineGui(tk.Tk):
         self.square_active = False
         self.cal_sweep_active = False
         self.all_cal_active = False
+        self.selected_autocal_active = False
+        self.selected_autocal_phase = "idle"
         self.hall_auto_cal_active = False
         self.cancel_endpoint_average(silent=True, zero_throttle=False)
 
@@ -1547,6 +1701,120 @@ class EngineGui(tk.Tk):
         elif not was_active and zero_throttle and not silent:
             self.endpoint_average_status.set("No endpoint averaging was active; throttle forced to 0%.")
 
+    def get_configs_selected_motor(self) -> None:
+        if not self.reselect_selected_board():
+            return
+        self.send_line("GETCFG")
+        self.tuning_status.set("Requested runtime/FRAM config from selected motor")
+
+    def parse_config_line(self, text: str) -> None:
+        parts = text.split(maxsplit=1)
+        kind = parts[0] if parts else ""
+        rest = parts[1] if len(parts) > 1 else ""
+        kv = self.parse_kv(rest)
+        changed: list[str] = []
+
+        if kind == "PID":
+            if "kp" in kv and self._set_config_field_if_idle(self.kp_var, kv["kp"], "Kp"):
+                changed.append("Kp")
+            if "ki" in kv and self._set_config_field_if_idle(self.ki_var, kv["ki"], "Ki"):
+                changed.append("Ki")
+        elif kind == "PID2":
+            if "kd" in kv and self._set_config_field_if_idle(self.kd_var, kv["kd"], "Kd"):
+                changed.append("Kd")
+            if "limit" in kv and self._set_config_field_if_idle(self.limit_var, kv["limit"], "PID limit"):
+                changed.append("PID limit")
+        elif kind == "FF0":
+            if "rpm" in kv and self._set_config_field_if_idle(self.ff0_rpm_var, kv["rpm"], "0% RPM"):
+                changed.append("0% RPM")
+            if "us" in kv and self._set_config_field_if_idle(self.ff0_us_var, kv["us"], "0% us"):
+                changed.append("0% us")
+        elif kind == "FF100":
+            if "rpm" in kv and self._set_config_field_if_idle(self.ff100_rpm_var, kv["rpm"], "100% RPM"):
+                changed.append("100% RPM")
+            if "us" in kv and self._set_config_field_if_idle(self.ff100_us_var, kv["us"], "100% us"):
+                changed.append("100% us")
+        elif kind == "MISC":
+            if "start_us" in kv and self._set_config_field_if_idle(self.start_us_var, kv["start_us"], "Start us"):
+                changed.append("Start us")
+            if "hold_ms" in kv and self._set_config_field_if_idle(self.start_hold_ms_var, kv["hold_ms"], "Start hold ms"):
+                changed.append("Start hold")
+            if "high_raw" in kv and self._set_config_field_if_idle(self.hall_high_raw_var, kv["high_raw"], "RPM high raw"):
+                changed.append("RPM high")
+            if "low_raw" in kv and self._set_config_field_if_idle(self.hall_low_raw_var, kv["low_raw"], "RPM low raw"):
+                changed.append("RPM low")
+        else:
+            return
+
+        if changed:
+            self.tuning_status.set("Pulled selected-motor config: " + ", ".join(changed))
+            self.save_settings(silent=True)
+
+    def send_config_field(self, key: str) -> None:
+        if key in {"kp", "ki", "kd", "limit"}:
+            self.send_pid_config_only()
+        elif key in {"ff0_rpm", "ff0_us"}:
+            self.send_ff0_config_only()
+        elif key in {"ff100_rpm", "ff100_us"}:
+            self.send_ff100_config_only()
+        elif key in {"start_us", "start_hold_ms"}:
+            self.apply_start_config_only()
+        elif key in {"hall_high", "hall_low"}:
+            self.apply_rpm_thresholds()
+
+    def send_pid_config_only(self) -> None:
+        if not self.reselect_selected_board():
+            return
+        try:
+            kp = float(self.kp_var.get())
+            ki = float(self.ki_var.get())
+            kd = float(self.kd_var.get())
+            limit = float(self.limit_var.get())
+        except ValueError:
+            messagebox.showerror("Bad PID value", "Kp, Ki, Kd, and PID limit must be numeric.")
+            return
+        if min(kp, ki, kd) < 0.0:
+            messagebox.showerror("Bad PID", "PID gains must be non-negative.")
+            return
+        if limit <= 0.0 or limit > 2000.0:
+            messagebox.showerror("Bad PID limit", "PID correction limit must be in (0, 2000] us.")
+            return
+        self.send_line(f"PID {kp:.8g} {ki:.8g} {kd:.8g} {limit:.8g}")
+        self.tuning_status.set(f"PID sent to selected motor: Kp={kp:.8g}, Ki={ki:.8g}, Kd={kd:.8g}, limit={limit:.8g} us")
+        self.save_settings(silent=True)
+
+    def send_ff0_config_only(self) -> None:
+        if not self.reselect_selected_board():
+            return
+        try:
+            rpm = float(self.ff0_rpm_var.get())
+            us = int(float(self.ff0_us_var.get()))
+        except ValueError:
+            messagebox.showerror("Bad 0% feedforward", "0% RPM and 0% us must be numeric.")
+            return
+        if rpm < 0.0 or not (1000 <= us <= 2000):
+            messagebox.showerror("Bad 0% feedforward", "0% RPM must be non-negative and 0% us must be 1000..2000.")
+            return
+        self.send_line(f"FF0 {rpm:.8g} {us}")
+        self.tuning_status.set(f"0% feedforward sent to selected motor: {rpm:.1f} RPM, {us} us")
+        self.save_settings(silent=True)
+
+    def send_ff100_config_only(self) -> None:
+        if not self.reselect_selected_board():
+            return
+        try:
+            rpm = float(self.ff100_rpm_var.get())
+            us = int(float(self.ff100_us_var.get()))
+        except ValueError:
+            messagebox.showerror("Bad 100% feedforward", "100% RPM and 100% us must be numeric.")
+            return
+        if rpm <= 0.0 or not (1000 <= us <= 2000):
+            messagebox.showerror("Bad 100% feedforward", "100% RPM must be positive and 100% us must be 1000..2000.")
+            return
+        self.send_line(f"FF100 {rpm:.8g} {us}")
+        self.tuning_status.set(f"100% feedforward sent to selected motor: {rpm:.1f} RPM, {us} us")
+        self.save_settings(silent=True)
+
     def apply_tuning(self) -> None:
         if not self.reselect_selected_board():
             return
@@ -1674,7 +1942,7 @@ class EngineGui(tk.Tk):
         set_string(self.hall_cal_duration_var, ("rpm_sensor", "auto_cal_duration_s"), "0")
         set_string(self.endpoint_auto_rate_var, ("endpoint_auto_adjust", "rate_us_per_s"), "25")
         set_string(self.endpoint_auto_duration_var, ("endpoint_auto_adjust", "all_board_dwell_s"), "15")
-        set_string(self.endpoint_auto_start_us_var, ("endpoint_auto_adjust", "start_us"), "1500")
+        set_string(self.endpoint_auto_start_us_var, ("endpoint_auto_adjust", "start_us"), "1700")
         set_string(self.sweep_start_var, ("sweep", "start_pct"), "0")
         set_string(self.sweep_end_var, ("sweep", "end_pct"), "100")
         set_string(self.sweep_duration_var, ("sweep", "duration_s"), "12")
@@ -2054,6 +2322,9 @@ class EngineGui(tk.Tk):
         self.send_current_command()
 
     def update_active_pattern_value(self) -> None:
+        self.update_selected_engine_autocalibrate()
+        if self.selected_autocal_active:
+            return
         self.update_all_boards_endpoint_auto()
         if self.endpoint_average_active:
             self.update_endpoint_average()
