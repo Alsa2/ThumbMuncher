@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "actuators.h"
 #include "sensors.h"
@@ -80,6 +81,124 @@ static bool is_finite_local(float x)
     return isfinite(x);
 }
 
+
+static float eval_feedforward_model(const EngineFeedforwardModelConfig *model, float pct)
+{
+    if (model == NULL) {
+        return 0.0f;
+    }
+    pct = clampf_engine(pct, 0.0f, 100.0f);
+    const float x = pct * 0.01f;
+
+    if (model->model_type == ENGINE_FF_MODEL_POLYNOMIAL) {
+        float y = model->coefficients[model->polynomial_order];
+        for (int order = (int)model->polynomial_order - 1; order >= 0; --order) {
+            y = y * x + model->coefficients[order];
+        }
+        return y;
+    }
+
+    const uint8_t n = model->point_count;
+    if (n < 2u) {
+        return 0.0f;
+    }
+    const uint16_t x100 = (uint16_t)(pct * 100.0f + 0.5f);
+    if (x100 <= model->point_pct_x100[0]) {
+        return (float)model->point_us[0];
+    }
+    if (x100 >= model->point_pct_x100[n - 1u]) {
+        return (float)model->point_us[n - 1u];
+    }
+    for (uint8_t i = 1u; i < n; ++i) {
+        if (x100 <= model->point_pct_x100[i]) {
+            const uint16_t xa = model->point_pct_x100[i - 1u];
+            const uint16_t xb = model->point_pct_x100[i];
+            const float ya = (float)model->point_us[i - 1u];
+            const float yb = (float)model->point_us[i];
+            const float alpha = (float)(x100 - xa) / (float)(xb - xa);
+            return ya + alpha * (yb - ya);
+        }
+    }
+    return (float)model->point_us[n - 1u];
+}
+
+void engine_control_make_default_feedforward_model(EngineFeedforwardModelConfig *out, uint16_t idle_us, uint16_t max_us)
+{
+    if (out == NULL) {
+        return;
+    }
+    memset(out, 0, sizeof(*out));
+    out->model_type = ENGINE_FF_MODEL_LINEAR;
+    out->point_count = 2u;
+    out->polynomial_order = 1u;
+    out->point_pct_x100[0] = 0u;
+    out->point_pct_x100[1] = 10000u;
+    out->point_us[0] = clamp_servo_us_runtime(idle_us);
+    out->point_us[1] = clamp_servo_us_runtime(max_us);
+    out->coefficients[0] = (float)out->point_us[0];
+    out->coefficients[1] = (float)((int32_t)out->point_us[1] - (int32_t)out->point_us[0]);
+}
+
+bool engine_control_feedforward_model_is_valid(const EngineFeedforwardModelConfig *model)
+{
+    if (model == NULL) {
+        return false;
+    }
+    if (model->model_type > ENGINE_FF_MODEL_PIECEWISE_LINEAR) {
+        return false;
+    }
+    if (model->model_type == ENGINE_FF_MODEL_POLYNOMIAL) {
+        if (model->polynomial_order < 1u || model->polynomial_order > ENGINE_FF_MAX_POLY_ORDER) {
+            return false;
+        }
+        for (uint8_t i = 0u; i <= model->polynomial_order; ++i) {
+            if (!is_finite_local(model->coefficients[i])) {
+                return false;
+            }
+        }
+    } else {
+        if (model->point_count < 2u || model->point_count > ENGINE_FF_MAX_POINTS) {
+            return false;
+        }
+        if (model->point_pct_x100[0] != 0u || model->point_pct_x100[model->point_count - 1u] != 10000u) {
+            return false;
+        }
+        for (uint8_t i = 0u; i < model->point_count; ++i) {
+            if (model->point_us[i] < SERVO_US_HARD_MIN || model->point_us[i] > SERVO_US_HARD_MAX) {
+                return false;
+            }
+            if (i > 0u && model->point_pct_x100[i] <= model->point_pct_x100[i - 1u]) {
+                return false;
+            }
+        }
+    }
+
+    const float y0 = eval_feedforward_model(model, 0.0f);
+    const float y100 = eval_feedforward_model(model, 100.0f);
+    if (!is_finite_local(y0) || !is_finite_local(y100) ||
+        y0 < (float)SERVO_US_HARD_MIN || y0 > (float)SERVO_US_HARD_MAX ||
+        y100 < (float)SERVO_US_HARD_MIN || y100 > (float)SERVO_US_HARD_MAX) {
+        return false;
+    }
+    const float direction = y100 - y0;
+    if (fabsf(direction) < 1.0f) {
+        return false;
+    }
+    float previous = y0;
+    for (int i = 1; i <= 100; ++i) {
+        const float y = eval_feedforward_model(model, (float)i);
+        if (!is_finite_local(y) || y < (float)SERVO_US_HARD_MIN || y > (float)SERVO_US_HARD_MAX) {
+            return false;
+        }
+        if ((direction < 0.0f && y > previous + 1.0f) ||
+            (direction > 0.0f && y < previous - 1.0f)) {
+            return false;
+        }
+        previous = y;
+    }
+    return true;
+}
+
 static bool validate_runtime_config(const EngineControlRuntimeConfig *cfg)
 {
     if (cfg == NULL) {
@@ -105,6 +224,9 @@ static bool validate_runtime_config(const EngineControlRuntimeConfig *cfg)
         cfg->correction_limit_us <= 0.0f || cfg->correction_limit_us > 2000.0f) {
         return false;
     }
+    if (!engine_control_feedforward_model_is_valid(&cfg->feedforward_model)) {
+        return false;
+    }
     return true;
 }
 
@@ -117,9 +239,7 @@ static float throttle_pct_to_target_rpm(float pct)
 
 static float throttle_pct_to_feedforward_us(float pct)
 {
-    pct = normalize_pct(pct);
-    return (float)g_cfg.idle_us +
-           (pct / 100.0f) * ((float)g_cfg.max_us - (float)g_cfg.idle_us);
+    return eval_feedforward_model(&g_cfg.feedforward_model, normalize_pct(pct));
 }
 
 static uint16_t lerp_u16(uint16_t a, uint16_t b, uint32_t elapsed_ms, uint32_t duration_ms)
@@ -180,6 +300,91 @@ static void set_throttle_start(void)
     actuators_set_throttle_us(g_ctrl.output_us);
 }
 
+static void set_pid_limits_for_feedforward(float feedforward_us)
+{
+    // out_us = feedforward_us - correction_us. Translate the physical servo
+    // hard stops into the correction domain, then intersect with the configured
+    // PID authority limit.
+    float correction_min = feedforward_us - (float)SERVO_US_HARD_MAX;
+    float correction_max = feedforward_us - (float)SERVO_US_HARD_MIN;
+    correction_min = clampf_engine(correction_min,
+                                   -g_cfg.correction_limit_us,
+                                   g_cfg.correction_limit_us);
+    correction_max = clampf_engine(correction_max,
+                                   -g_cfg.correction_limit_us,
+                                   g_cfg.correction_limit_us);
+    pid_set_output_limits(&g_pid, correction_min, correction_max);
+}
+
+static void apply_runtime_config_live(const EngineControlRuntimeConfig *cfg)
+{
+    const uint16_t previous_output_us = g_ctrl.output_us;
+    g_cfg = *cfg;
+    reset_pid_with_current_config();
+
+    // A live feedforward/PID update must not step the throttle. While closed-loop
+    // control is active, preload the PID correction so the new model produces the
+    // exact PWM that was already being commanded. The next control iteration then
+    // transitions smoothly from that operating point.
+    if ((g_ctrl.state == ENGINE_RUNNING || g_ctrl.state == ENGINE_IDLE_WAIT_FOR_ZERO) &&
+        !g_ctrl.manual_pwm_bypass_active && !g_auto.active) {
+        EngineSensors sensors;
+        sensors_snapshot(&sensors);
+        const float pct = (g_ctrl.state == ENGINE_IDLE_WAIT_FOR_ZERO) ? 0.0f : g_ctrl.cmd_pct;
+        g_ctrl.target_rpm = throttle_pct_to_target_rpm(pct);
+        g_ctrl.feedforward_us = throttle_pct_to_feedforward_us(pct);
+        set_pid_limits_for_feedforward(g_ctrl.feedforward_us);
+
+        const float desired_correction =
+            g_ctrl.feedforward_us - (float)previous_output_us;
+        const float error = g_ctrl.target_rpm - sensors.rpm;
+        pid_track_output(&g_pid, desired_correction, error);
+        g_ctrl.pid_correction_us = clampf_engine(desired_correction,
+                                                g_pid.out_min,
+                                                g_pid.out_max);
+        g_ctrl.output_us = clamp_servo_us_runtime(previous_output_us);
+        actuators_set_throttle_us(g_ctrl.output_us);
+    } else if (g_ctrl.state == ENGINE_DISARMED) {
+        set_throttle_idle();
+    }
+    // During waiting/priming, endpoint auto-tune, and direct PWM bypass, keep the
+    // currently commanded actuator value. The new model becomes active as soon as
+    // normal closed-loop control resumes.
+}
+
+static bool model_with_replaced_endpoint(const EngineFeedforwardModelConfig *source,
+                                         bool replace_max,
+                                         uint16_t new_us,
+                                         EngineFeedforwardModelConfig *out)
+{
+    if (source == NULL || out == NULL) {
+        return false;
+    }
+    *out = *source;
+    const float old_endpoint = eval_feedforward_model(source, replace_max ? 100.0f : 0.0f);
+    const float delta = (float)new_us - old_endpoint;
+
+    if (out->model_type == ENGINE_FF_MODEL_POLYNOMIAL) {
+        if (replace_max) {
+            // Add delta*x: leaves x=0 unchanged and moves x=1 by delta.
+            out->coefficients[1] += delta;
+        } else {
+            // Add delta*(1-x): moves x=0 by delta and leaves x=1 unchanged.
+            out->coefficients[0] += delta;
+            out->coefficients[1] -= delta;
+        }
+    } else {
+        const uint8_t endpoint_index = replace_max ? (uint8_t)(out->point_count - 1u) : 0u;
+        out->point_us[endpoint_index] = clamp_servo_us_runtime(new_us);
+        // Keep the coefficient mirror meaningful in configuration telemetry even
+        // though point-based model evaluation does not depend on it.
+        out->coefficients[0] = (float)out->point_us[0];
+        out->coefficients[1] = (float)((int32_t)out->point_us[out->point_count - 1u] -
+                                       (int32_t)out->point_us[0]);
+    }
+    return engine_control_feedforward_model_is_valid(out);
+}
+
 static uint16_t apply_feedforward_pid(float cmd_pct, float measured_rpm, float dt_s)
 {
     g_ctrl.target_rpm = throttle_pct_to_target_rpm(cmd_pct);
@@ -187,6 +392,13 @@ static uint16_t apply_feedforward_pid(float cmd_pct, float measured_rpm, float d
 
     // Positive RPM error means the engine is slow. This servo opens as PWM gets
     // smaller, so the PID correction is subtracted from the feedforward pulse.
+    //
+    // The feedforward curve is only the nominal starting point. PID is allowed
+    // to move past the fitted 0% and 100% endpoint values and use the complete
+    // physical servo range. The available correction range is asymmetric near
+    // a hard stop, so update it for this feedforward operating point.
+    set_pid_limits_for_feedforward(g_ctrl.feedforward_us);
+
     g_ctrl.pid_correction_us = pid_update(&g_pid,
                                           g_ctrl.target_rpm,
                                           measured_rpm,
@@ -194,10 +406,11 @@ static uint16_t apply_feedforward_pid(float cmd_pct, float measured_rpm, float d
 
     float out_us = g_ctrl.feedforward_us - g_ctrl.pid_correction_us;
 
-    // Stay inside the feedforward endpoint span, regardless of endpoint ordering.
-    const float lo = ((float)g_cfg.idle_us < (float)g_cfg.max_us) ? (float)g_cfg.idle_us : (float)g_cfg.max_us;
-    const float hi = ((float)g_cfg.idle_us > (float)g_cfg.max_us) ? (float)g_cfg.idle_us : (float)g_cfg.max_us;
-    out_us = clampf_engine(out_us, lo, hi);
+    // Final actuator safety clamp. Unlike the old endpoint clamp, this permits
+    // PID to continue correcting beyond the calibrated 0%/100% PWM values.
+    out_us = clampf_engine(out_us,
+                           (float)SERVO_US_HARD_MIN,
+                           (float)SERVO_US_HARD_MAX);
 
     g_ctrl.output_us = round_to_u16(out_us);
     actuators_set_throttle_us(g_ctrl.output_us);
@@ -256,6 +469,7 @@ static uint16_t apply_endpoint_auto(float measured_rpm, float dt_s)
     const uint16_t endpoint_after = clamp_servo_us_runtime(round_to_u16(g_auto.current_us_f));
     if (endpoint_after != *endpoint_us) {
         *endpoint_us = endpoint_after;
+        engine_control_make_default_feedforward_model(&g_cfg.feedforward_model, g_cfg.idle_us, g_cfg.max_us);
         g_config_dirty = true;
     }
 
@@ -392,18 +606,6 @@ static void run_manual_pwm_test(uint32_t now_ms, float rpm)
     actuators_set_throttle_us(g_ctrl.output_us);
 }
 
-static void abort_hall_auto_cal_to_disarmed(uint32_t now_ms)
-{
-    (void)sensors_stop_hall_auto_cal(true);
-    outputs_safe_disarmed();
-    pid_reset(&g_pid);
-    g_ctrl.target_rpm = 0.0f;
-    g_ctrl.feedforward_us = (float)g_cfg.idle_us;
-    g_ctrl.pid_correction_us = 0.0f;
-    g_ctrl.output_us = g_cfg.idle_us;
-    enter_state(ENGINE_DISARMED, now_ms);
-}
-
 static void run_hall_auto_cal(uint32_t now_ms)
 {
     // This mode deliberately powers the relay because the Hall sensor is on the
@@ -444,6 +646,7 @@ void engine_control_init(void)
     g_cfg.correction_limit_us = RPM_PID_CORRECTION_LIMIT_US;
     g_cfg.start_us = THROTTLE_START_US;
     g_cfg.start_hold_ms = START_HOLD_AFTER_RPM_MS;
+    engine_control_make_default_feedforward_model(&g_cfg.feedforward_model, g_cfg.idle_us, g_cfg.max_us);
 
     g_ctrl.state = ENGINE_DISARMED;
     g_ctrl.armed = false;
@@ -483,8 +686,7 @@ bool engine_control_set_pid(float kp, float ki, float kd, float correction_limit
     if (!validate_runtime_config(&cfg)) {
         return false;
     }
-    g_cfg = cfg;
-    reset_pid_with_current_config();
+    apply_runtime_config_live(&cfg);
     g_config_dirty = true;
     return true;
 }
@@ -497,12 +699,24 @@ bool engine_control_set_feedforward_idle(float rpm, uint16_t throttle_us)
     if (throttle_us < SERVO_US_HARD_MIN || throttle_us > SERVO_US_HARD_MAX) {
         return false;
     }
-    g_cfg.idle_rpm = rpm;
-    g_cfg.idle_us = clamp_servo_us_runtime(throttle_us);
-    g_config_dirty = true;
-    if (g_ctrl.state == ENGINE_DISARMED) {
-        set_throttle_idle();
+
+    EngineControlRuntimeConfig cfg = g_cfg;
+    cfg.idle_rpm = rpm;
+    if (!model_with_replaced_endpoint(&g_cfg.feedforward_model,
+                                      false,
+                                      throttle_us,
+                                      &cfg.feedforward_model)) {
+        return false;
     }
+    cfg.idle_us = clamp_servo_us_runtime(round_to_u16(
+        eval_feedforward_model(&cfg.feedforward_model, 0.0f)));
+    cfg.max_us = clamp_servo_us_runtime(round_to_u16(
+        eval_feedforward_model(&cfg.feedforward_model, 100.0f)));
+    if (!validate_runtime_config(&cfg)) {
+        return false;
+    }
+    apply_runtime_config_live(&cfg);
+    g_config_dirty = true;
     return true;
 }
 
@@ -514,12 +728,71 @@ bool engine_control_set_feedforward_max(float rpm, uint16_t throttle_us)
     if (throttle_us < SERVO_US_HARD_MIN || throttle_us > SERVO_US_HARD_MAX) {
         return false;
     }
-    g_cfg.max_rpm = rpm;
-    g_cfg.max_us = clamp_servo_us_runtime(throttle_us);
+
+    EngineControlRuntimeConfig cfg = g_cfg;
+    cfg.max_rpm = rpm;
+    if (!model_with_replaced_endpoint(&g_cfg.feedforward_model,
+                                      true,
+                                      throttle_us,
+                                      &cfg.feedforward_model)) {
+        return false;
+    }
+    cfg.idle_us = clamp_servo_us_runtime(round_to_u16(
+        eval_feedforward_model(&cfg.feedforward_model, 0.0f)));
+    cfg.max_us = clamp_servo_us_runtime(round_to_u16(
+        eval_feedforward_model(&cfg.feedforward_model, 100.0f)));
+    if (!validate_runtime_config(&cfg)) {
+        return false;
+    }
+    apply_runtime_config_live(&cfg);
     g_config_dirty = true;
     return true;
 }
 
+bool engine_control_set_feedforward_fit(float idle_rpm, float max_rpm, const EngineFeedforwardModelConfig *model)
+{
+    if (!is_finite_local(idle_rpm) || !is_finite_local(max_rpm) ||
+        idle_rpm < 0.0f || max_rpm <= idle_rpm || max_rpm > 50000.0f ||
+        !engine_control_feedforward_model_is_valid(model)) {
+        return false;
+    }
+    EngineControlRuntimeConfig cfg = g_cfg;
+    cfg.idle_rpm = idle_rpm;
+    cfg.max_rpm = max_rpm;
+    cfg.feedforward_model = *model;
+    cfg.idle_us = clamp_servo_us_runtime(round_to_u16(eval_feedforward_model(model, 0.0f)));
+    cfg.max_us = clamp_servo_us_runtime(round_to_u16(eval_feedforward_model(model, 100.0f)));
+    if (!validate_runtime_config(&cfg)) {
+        return false;
+    }
+    apply_runtime_config_live(&cfg);
+    g_config_dirty = true;
+    return true;
+}
+
+bool engine_control_set_feedforward_model(const EngineFeedforwardModelConfig *model)
+{
+    if (!engine_control_feedforward_model_is_valid(model)) {
+        return false;
+    }
+    EngineControlRuntimeConfig cfg = g_cfg;
+    cfg.feedforward_model = *model;
+    cfg.idle_us = clamp_servo_us_runtime(round_to_u16(eval_feedforward_model(model, 0.0f)));
+    cfg.max_us = clamp_servo_us_runtime(round_to_u16(eval_feedforward_model(model, 100.0f)));
+    if (!validate_runtime_config(&cfg)) {
+        return false;
+    }
+    apply_runtime_config_live(&cfg);
+    g_config_dirty = true;
+    return true;
+}
+
+void engine_control_get_feedforward_model(EngineFeedforwardModelConfig *out)
+{
+    if (out != NULL) {
+        *out = g_cfg.feedforward_model;
+    }
+}
 
 bool engine_control_set_start_config(uint16_t start_us, uint16_t start_hold_ms)
 {

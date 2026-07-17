@@ -23,7 +23,7 @@
 #endif
 
 #define FRAM_CONFIG_MAGIC   0x454D4346u  // 'EMCF'
-#define FRAM_CONFIG_VERSION 4u
+#define FRAM_CONFIG_VERSION 5u
 
 typedef struct __attribute__((packed)) {
     uint32_t magic;
@@ -81,11 +81,45 @@ typedef struct __attribute__((packed)) {
     uint16_t start_us;
     uint16_t start_hold_ms;
     uint8_t reserved[12];
+} PersistentConfigRecordV4;
+
+typedef struct __attribute__((packed)) {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t size;
+    uint32_t crc32;
+    uint32_t save_counter;
+
+    float idle_rpm;
+    float max_rpm;
+    uint16_t idle_us;
+    uint16_t max_us;
+
+    float kp_us_per_rpm;
+    float ki_us_per_rpm_s;
+    float kd_us_per_rpm_per_s;
+    float correction_limit_us;
+
+    uint16_t hall_threshold_high_raw;
+    uint16_t hall_threshold_low_raw;
+
+    uint32_t board_id;
+    uint16_t hall_cal_min_raw;
+    uint16_t hall_cal_max_raw;
+    uint16_t start_us;
+    uint16_t start_hold_ms;
+
+    // Version 5 adds the atomically committed feedforward fit model.
+    EngineFeedforwardModelConfig feedforward_model;
+    uint8_t reserved[8];
 } PersistentConfigRecord;
 
 #ifndef FRAM_BOARD_ID_ADDR
 #define FRAM_BOARD_ID_ADDR 0x0100u
 #endif
+
+_Static_assert(sizeof(PersistentConfigRecord) <= FRAM_BOARD_ID_ADDR,
+               "Persistent config record overlaps the dedicated FRAM board-ID record");
 
 #define FRAM_BOARD_ID_MAGIC   0x454D4944u  // 'EMID'
 #define FRAM_BOARD_ID_VERSION 1u
@@ -121,6 +155,13 @@ static uint32_t crc32_update(uint32_t crc, const uint8_t *data, size_t len)
 static uint32_t record_crc(const PersistentConfigRecord *rec)
 {
     PersistentConfigRecord tmp = *rec;
+    tmp.crc32 = 0u;
+    return crc32_update(0u, (const uint8_t *)&tmp, sizeof(tmp));
+}
+
+static uint32_t record_v4_crc(const PersistentConfigRecordV4 *rec)
+{
+    PersistentConfigRecordV4 tmp = *rec;
     tmp.crc32 = 0u;
     return crc32_update(0u, (const uint8_t *)&tmp, sizeof(tmp));
 }
@@ -266,9 +307,47 @@ static bool validate_record_v3(const PersistentConfigRecordV3 *rec)
         .start_us = THROTTLE_START_US,
         .start_hold_ms = START_HOLD_AFTER_RPM_MS,
     };
+    engine_control_make_default_feedforward_model(&cfg.feedforward_model, cfg.idle_us, cfg.max_us);
     if (!engine_control_runtime_config_is_valid(&cfg)) return false;
     if (!sensors_hall_thresholds_are_valid(rec->hall_threshold_high_raw, rec->hall_threshold_low_raw)) return false;
     if (rec->board_id != 0u && !board_id_is_valid(rec->board_id)) return false;
+    if ((rec->hall_cal_min_raw != 0u || rec->hall_cal_max_raw != 0u) &&
+        !sensors_hall_calibration_is_valid(rec->hall_cal_min_raw, rec->hall_cal_max_raw)) {
+        return false;
+    }
+    return true;
+}
+
+static bool validate_record_v4(const PersistentConfigRecordV4 *rec)
+{
+    if (rec == NULL) return false;
+    if (rec->magic != FRAM_CONFIG_MAGIC) return false;
+    if (rec->version != 4u) return false;
+    if (rec->size != sizeof(PersistentConfigRecordV4)) return false;
+    if (record_v4_crc(rec) != rec->crc32) return false;
+
+    EngineControlRuntimeConfig cfg = {
+        .idle_rpm = rec->idle_rpm,
+        .max_rpm = rec->max_rpm,
+        .idle_us = rec->idle_us,
+        .max_us = rec->max_us,
+        .kp_us_per_rpm = rec->kp_us_per_rpm,
+        .ki_us_per_rpm_s = rec->ki_us_per_rpm_s,
+        .kd_us_per_rpm_per_s = rec->kd_us_per_rpm_per_s,
+        .correction_limit_us = rec->correction_limit_us,
+        .start_us = rec->start_us,
+        .start_hold_ms = rec->start_hold_ms,
+    };
+    engine_control_make_default_feedforward_model(&cfg.feedforward_model, cfg.idle_us, cfg.max_us);
+    if (!engine_control_runtime_config_is_valid(&cfg)) {
+        return false;
+    }
+    if (!sensors_hall_thresholds_are_valid(rec->hall_threshold_high_raw, rec->hall_threshold_low_raw)) {
+        return false;
+    }
+    if (rec->board_id != 0u && !board_id_is_valid(rec->board_id)) {
+        return false;
+    }
     if ((rec->hall_cal_min_raw != 0u || rec->hall_cal_max_raw != 0u) &&
         !sensors_hall_calibration_is_valid(rec->hall_cal_min_raw, rec->hall_cal_max_raw)) {
         return false;
@@ -295,20 +374,13 @@ static bool validate_record(const PersistentConfigRecord *rec)
         .correction_limit_us = rec->correction_limit_us,
         .start_us = rec->start_us,
         .start_hold_ms = rec->start_hold_ms,
+        .feedforward_model = rec->feedforward_model,
     };
-    if (!engine_control_runtime_config_is_valid(&cfg)) {
-        return false;
-    }
-    if (!sensors_hall_thresholds_are_valid(rec->hall_threshold_high_raw, rec->hall_threshold_low_raw)) {
-        return false;
-    }
-    if (rec->board_id != 0u && !board_id_is_valid(rec->board_id)) {
-        return false;
-    }
+    if (!engine_control_runtime_config_is_valid(&cfg)) return false;
+    if (!sensors_hall_thresholds_are_valid(rec->hall_threshold_high_raw, rec->hall_threshold_low_raw)) return false;
+    if (rec->board_id != 0u && !board_id_is_valid(rec->board_id)) return false;
     if ((rec->hall_cal_min_raw != 0u || rec->hall_cal_max_raw != 0u) &&
-        !sensors_hall_calibration_is_valid(rec->hall_cal_min_raw, rec->hall_cal_max_raw)) {
-        return false;
-    }
+        !sensors_hall_calibration_is_valid(rec->hall_cal_min_raw, rec->hall_cal_max_raw)) return false;
     return true;
 }
 
@@ -340,6 +412,28 @@ bool persistent_config_load_into_runtime(void)
         return false;
     }
     if (!validate_record(&rec)) {
+        PersistentConfigRecordV4 rec4;
+        memset(&rec4, 0, sizeof(rec4));
+        if (fram_read(FRAM_CONFIG_ADDR, (uint8_t *)&rec4, sizeof(rec4)) && validate_record_v4(&rec4)) {
+            EngineControlRuntimeConfig cfg4 = {
+                .idle_rpm = rec4.idle_rpm, .max_rpm = rec4.max_rpm,
+                .idle_us = rec4.idle_us, .max_us = rec4.max_us,
+                .kp_us_per_rpm = rec4.kp_us_per_rpm, .ki_us_per_rpm_s = rec4.ki_us_per_rpm_s,
+                .kd_us_per_rpm_per_s = rec4.kd_us_per_rpm_per_s, .correction_limit_us = rec4.correction_limit_us,
+                .start_us = rec4.start_us, .start_hold_ms = rec4.start_hold_ms,
+            };
+            engine_control_make_default_feedforward_model(&cfg4.feedforward_model, cfg4.idle_us, cfg4.max_us);
+            if (!engine_control_apply_runtime_config(&cfg4)) return false;
+            if (!sensors_apply_hall_thresholds_raw(rec4.hall_threshold_high_raw, rec4.hall_threshold_low_raw)) return false;
+            if (sensors_hall_calibration_is_valid(rec4.hall_cal_min_raw, rec4.hall_cal_max_raw))
+                (void)sensors_apply_hall_calibration_raw(rec4.hall_cal_min_raw, rec4.hall_cal_max_raw);
+            g_save_counter = rec4.save_counter;
+            uint32_t fallback_board_id_v4 = 0u;
+            g_loaded_board_id = load_board_id_record(&fallback_board_id_v4) ? fallback_board_id_v4 : rec4.board_id;
+            g_last_load_valid = true;
+            return true;
+        }
+
         PersistentConfigRecordV3 rec3;
         memset(&rec3, 0, sizeof(rec3));
         if (fram_read(FRAM_CONFIG_ADDR, (uint8_t *)&rec3, sizeof(rec3)) &&
@@ -356,6 +450,7 @@ bool persistent_config_load_into_runtime(void)
                 .start_us = THROTTLE_START_US,
                 .start_hold_ms = START_HOLD_AFTER_RPM_MS,
             };
+            engine_control_make_default_feedforward_model(&cfg3.feedforward_model, cfg3.idle_us, cfg3.max_us);
             if (!engine_control_apply_runtime_config(&cfg3)) return false;
             if (!sensors_apply_hall_thresholds_raw(rec3.hall_threshold_high_raw, rec3.hall_threshold_low_raw)) return false;
             if (sensors_hall_calibration_is_valid(rec3.hall_cal_min_raw, rec3.hall_cal_max_raw)) {
@@ -390,6 +485,7 @@ bool persistent_config_load_into_runtime(void)
         .correction_limit_us = rec.correction_limit_us,
         .start_us = rec.start_us,
         .start_hold_ms = rec.start_hold_ms,
+        .feedforward_model = rec.feedforward_model,
     };
 
     if (!engine_control_apply_runtime_config(&cfg)) {
@@ -445,6 +541,7 @@ bool persistent_config_save_from_runtime(void)
     rec.correction_limit_us = cfg.correction_limit_us;
     rec.start_us = cfg.start_us;
     rec.start_hold_ms = cfg.start_hold_ms;
+    rec.feedforward_model = cfg.feedforward_model;
     rec.hall_threshold_high_raw = hall_high;
     rec.hall_threshold_low_raw = hall_low;
     rec.board_id = custom_can_node_get_board_id();

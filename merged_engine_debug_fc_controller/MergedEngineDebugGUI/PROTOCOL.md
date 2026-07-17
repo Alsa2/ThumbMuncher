@@ -19,6 +19,13 @@ All frames are **29-bit extended classic CAN**.
 | `0x1CEB0011` | `PID_KD_LIMIT` | `float32 kd`, `float32 correction_limit_us` |
 | `0x1CEB0020` | `FF_IDLE` | `float32 rpm_at_0_pct`, `u16 throttle_us_at_0_pct`, two reserved bytes |
 | `0x1CEB0021` | `FF_MAX` | `float32 rpm_at_100_pct`, `u16 throttle_us_at_100_pct`, two reserved bytes |
+| `0x1CEB0023` | `START_CONFIG` | `u16 start_us`, `u16 hold_after_rpm_ms`, four reserved bytes |
+| `0x1CEB0024` | `MANUAL_PWM_TEST` | `u16 pwm_us`, `u16 hold_ms`, four reserved bytes |
+| `0x1CEB0025` | `FF_MODEL_META` | `u8 model_type`, `u8 point_count`, `u8 polynomial_order`, five reserved bytes |
+| `0x1CEB0026` | `FF_MODEL_COEFF` | `u8 coefficient_index`, reserved byte, `float32 coefficient`, two reserved bytes |
+| `0x1CEB0027` | `FF_MODEL_POINT` | `u8 point_index`, reserved byte, `u16 throttle_pct_x100`, `u16 pwm_us`, two reserved bytes |
+| `0x1CEB0028` | `FF_MODEL_COMMIT` | `u8 action`, seven reserved bytes |
+| `0x1CEB0029` | `FF_MODEL_RPM` | `float32 rpm_at_0_pct`, `float32 rpm_at_100_pct` |
 | `0x1CEB0022` | `RPM_THRESH` | `u16 hall_high_raw`, `u16 hall_low_raw`, four reserved bytes |
 | `0x1CEB0030` | `TELEMETRY_RATE` | `u16 telem_a_ms`, `u16 telem_b_ms`, `u16 telem_c_ms`, `u16 reserved` |
 | `0x1CEB0100` | `TELEM_A` | `float32 rpm`, `u16 output_us`, `u8 engine_state`, `u8 flags` |
@@ -27,6 +34,14 @@ All frames are **29-bit extended classic CAN**.
 | `0x1CEB0110` | `BOARD_ANNOUNCE` | `u32 board_id`, `u16 rpm`, `u8 state`, `u8 flags` |
 | `0x1CEB0111` | `AUTO_STATUS` | `u8 endpoint`, `u8 active`, `u16 endpoint_us`, `i16 rpm_error_x10`, `u16 target_rpm` |
 | `0x1CEB0112` | `HALL_CAL_STATUS` | `u8 status`, `u8 quality_pct`, `u16 min_raw`, `u16 max_raw`, `u16 target_rpm` |
+| `0x1CEB0113` | `CONFIG_PID_A` | Pulled `kp`, `ki` |
+| `0x1CEB0114` | `CONFIG_PID_B` | Pulled `kd`, correction limit |
+| `0x1CEB0115` | `CONFIG_FF_IDLE` | Pulled 0% RPM/PWM endpoint |
+| `0x1CEB0116` | `CONFIG_FF_MAX` | Pulled 100% RPM/PWM endpoint |
+| `0x1CEB0117` | `CONFIG_MISC` | Pulled startup and Hall threshold values |
+| `0x1CEB0118` | `CONFIG_FF_MODEL_META` | Pulled model type/count/order |
+| `0x1CEB0119` | `CONFIG_FF_MODEL_COEFF` | Pulled polynomial coefficient |
+| `0x1CEB011A` | `CONFIG_FF_MODEL_POINT` | Pulled linear/piecewise knot |
 
 Numeric multibyte values are little-endian. Floats are IEEE-754 `float32`.
 
@@ -80,11 +95,46 @@ HALLCAL_STOP
 
 The GUI button **Auto-cal Hall min/max at spinner RPM** starts this routine and shows the normal abort popup. Abort sends `HALLCAL_STOP`, zero throttle, and disarm.
 
+
+## Atomic fitted feedforward model
+
+The serial commands accepted by the debug probe are:
+
+```text
+FFMODEL <type> <point_count> <polynomial_order>
+FFRPM <rpm_at_0_pct> <rpm_at_100_pct>
+FFCOEFF <index_0_to_3> <value>
+FFPOINT <index_0_to_11> <throttle_pct_0_to_100> <pwm_us_1000_to_2000>
+FFCOMMIT
+FFRESET
+FFCANCEL
+```
+
+Model types are `0=linear`, `1=polynomial`, and `2=piecewise linear`. Polynomial coefficients are low-order first and use `x = throttle_percent / 100`:
+
+```text
+pwm_us = c0 + c1*x + c2*x^2 + c3*x^3
+```
+
+`FFMODEL` starts a fresh controller-side staging transaction. `FFRPM` plus all required coefficient or knot frames fill that transaction. No active runtime or FRAM value changes until `FFCOMMIT`. The commit is accepted only when:
+
+- the complete set of required frames was received,
+- RPM endpoints are finite and increasing,
+- every evaluated PWM remains inside 1000–2000 µs,
+- the curve spans a nonzero PWM range and remains monotonic,
+- point models have 2–12 strictly ordered knots starting at 0% and ending at 100%,
+- polynomial order is 1–3,
+- the complete staged model passes endpoint, range, and monotonic validation.
+
+Commit/reset may occur while running. The controller preloads PID state so the actuator PWM is unchanged at the model-swap instant. `FFCANCEL` discards staging without changing the active model. An incomplete staging transaction also expires after five seconds before any later commit is processed. `FFRESET` replaces the active model with a two-point linear curve using the selected engine's current endpoint PWM values.
+
+The GUI performs an explicit `GETCFG` pull after commit and compares the returned selected-board RPM endpoints and coefficients/knots against the sent model. A bridge `OK` line alone is not treated as proof that the controller accepted the model.
+
 ## FRAM-persisted settings
 
 The controller saves these settings in the onboard FM24CL64B-compatible FRAM at I2C address `0x50` on the board I2C1 lane:
 
-- 0% and 100% throttle feedforward servo positions and RPM endpoints.
+- 0% and 100% RPM endpoints plus the validated linear, polynomial, or piecewise feedforward model.
 - PID gains and correction limit.
 - RPM/Hall sensor high/low ADC raw thresholds.
 - Hall raw min/max values captured by `HALLCAL`.
@@ -160,3 +210,12 @@ Python/Tk 3.14 can return a transient ttk Combobox popdown focus path while the 
 v17 catches that focus-path case, treats it as "not actively editing", and also wraps individual bridge-line parsing so one malformed/stale line can never stop the telemetry pump.  If telemetry still goes stale after an engine switch, the GUI reasserts `SELECT <id>` and `PROBE` about once per second until data resumes.
 
 Endpoint auto-adjust Abort/Stop behavior remains non-disarming: it sends `AUTO_STOP`, commands 0% throttle, and preserves the current ARM state.  Use Panic/Disarm for an actual disarm.
+
+## Maintained PWMBYPASS behavior
+
+```text
+PWMBYPASS <1000..2000>
+PWMBYPASS_STOP
+```
+
+The bridge accepts bypass only when a board is selected and the bridge command state is armed. It refreshes the armed command first, then transmits the exact PWM bypass. While active, the bridge retransmits the bypass on its 100 ms command heartbeat. `CMD 0 ...`, `ARM 0`, `CLEAR_SELECT`, `PANIC_ALL`, or `PWMBYPASS_STOP` clears the maintained bypass state.

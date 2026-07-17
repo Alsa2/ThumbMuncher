@@ -49,3 +49,7 @@ The bridge now sends `SELECT <board_id>` together with its periodic `CMD` heartb
 selected command heartbeat immediately, but it does not clear the bridge ARM
 state. This matches the GUI behavior: stopping endpoint auto-adjust returns the
 engine to 0% throttle without disarming it.
+
+## Maintained PWM bypass
+
+`PWMBYPASS <1000..2000>` now requires a selected board and an armed bridge command state. The probe sends the armed command before the bypass frame and then re-sends the exact bypass PWM on every 100 ms command heartbeat. This makes bypass recover from a dropped frame or a brief controller link/selection interruption. `PWMBYPASS_STOP`, disarm, clear-select, board selection change, or panic clears the maintained override.

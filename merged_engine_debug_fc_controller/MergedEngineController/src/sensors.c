@@ -424,8 +424,20 @@ static void update_hall_from_captured_period(void)
         last_period_us == 0u ||
         (now_us - last_edge_us) > zero_timeout_us) {
         g.hall_rpm_filtered = 0.0f;
-    g.hall_period_filtered_us_irq = 0u;
         g.s.rpm = 0.0f;
+
+        // hall_period_filtered_us_irq is owned by the Hall sampling interrupt.
+        // Previously the main loop cleared it without a critical section. A new
+        // edge could arrive between the snapshot and this write, then have its
+        // valid period erased. RPM would disappear and the engine state machine
+        // would fall back to priming/wait exactly RPM_ZERO_TIMEOUT_MS later, which
+        // can look like a two-second board reboot. Only clear the filter if the
+        // edge is still the same stale edge we snapshotted.
+        const uint32_t clear_irq_state = save_and_disable_interrupts();
+        if (g.hall_last_edge_us == last_edge_us) {
+            g.hall_period_filtered_us_irq = 0u;
+        }
+        restore_interrupts(clear_irq_state);
     } else {
         const float instant_rpm = 60000000.0f /
                                   ((float)last_period_us * HALL_PULSES_PER_REV);

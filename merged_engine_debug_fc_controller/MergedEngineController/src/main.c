@@ -4,6 +4,7 @@
 
 #include "pico/stdlib.h"
 #include "pico/time.h"
+#include "hardware/watchdog.h"
 
 #include "board_config.h"
 #include "actuators.h"
@@ -56,6 +57,7 @@ static void apply_identify_override(uint32_t ms)
 
 int main(void)
 {
+    const bool watchdog_reboot = watchdog_caused_reboot();
     stdio_init_all();
     sleep_ms(1200);
 
@@ -68,6 +70,7 @@ int main(void)
     const bool fram_loaded = persistent_config_load_into_runtime();
 
     printf("RP2040 merged FC/debug motor controller starting\r\n");
+    printf("Reset diagnostic: watchdog_caused_reboot=%d\r\n", (int)watchdog_reboot);
     printf("FRAM @0x%02X present=%d settings_loaded=%d\r\n", FRAM_I2C_ADDR, (int)fram_present, (int)fram_loaded);
     printf("FC default: DroneCAN fallback_node=%u fallback_esc_index=%u timeout=%ums\r\n",
            DRONECAN_NODE_ID,
@@ -311,9 +314,17 @@ int main(void)
         }
 
         if (config_save_pending && (int32_t)(ms - next_config_save_ms) >= 0) {
-            const bool saved = persistent_config_save_from_runtime();
-            printf("FRAM settings save %s\r\n", saved ? "OK" : "FAILED");
-            config_save_pending = false;
+            const EngineState save_state = engine_control_get_state();
+            if (save_state == ENGINE_PRIMING_AFTER_SPIN) {
+                // Do not start an I2C/FRAM transaction during the electrically
+                // noisy post-spin priming window. Runtime changes are already live;
+                // persistence waits until the engine leaves priming.
+                next_config_save_ms = ms + 500u;
+            } else {
+                const bool saved = persistent_config_save_from_runtime();
+                printf("FRAM settings save %s\r\n", saved ? "OK" : "FAILED");
+                config_save_pending = false;
+            }
         }
 
         dronecan_node_process_tx();

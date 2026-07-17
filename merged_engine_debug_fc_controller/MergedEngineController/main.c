@@ -4,6 +4,7 @@
 
 #include "pico/stdlib.h"
 #include "pico/time.h"
+#include "hardware/watchdog.h"
 
 #include "board_config.h"
 #include "actuators.h"
@@ -56,6 +57,7 @@ static void apply_identify_override(uint32_t ms)
 
 int main(void)
 {
+    const bool watchdog_reboot = watchdog_caused_reboot();
     stdio_init_all();
     sleep_ms(1200);
 
@@ -68,6 +70,7 @@ int main(void)
     const bool fram_loaded = persistent_config_load_into_runtime();
 
     printf("RP2040 merged FC/debug motor controller starting\r\n");
+    printf("Reset diagnostic: watchdog_caused_reboot=%d\r\n", (int)watchdog_reboot);
     printf("FRAM @0x%02X present=%d settings_loaded=%d\r\n", FRAM_I2C_ADDR, (int)fram_present, (int)fram_loaded);
     printf("FC default: DroneCAN fallback_node=%u fallback_esc_index=%u timeout=%ums\r\n",
            DRONECAN_NODE_ID,
@@ -159,6 +162,7 @@ int main(void)
             (void)engine_control_stop_endpoint_auto();
             (void)engine_control_stop_hall_auto_cal();
             (void)engine_control_stop_manual_pwm_test();
+            (void)engine_control_set_manual_pwm_bypass(false, 0u);
         }
         debug_was_alive = debug_alive;
 
@@ -182,6 +186,7 @@ int main(void)
             (void)engine_control_stop_endpoint_auto();
             (void)engine_control_stop_hall_auto_cal();
             (void)engine_control_stop_manual_pwm_test();
+            (void)engine_control_set_manual_pwm_bypass(false, 0u);
         }
 
         if (custom_can_node_consume_servo_test_request()) {
@@ -228,63 +233,77 @@ int main(void)
             next_esc_status_ms += ESC_STATUS_PERIOD_MS;
         }
 
-        if ((int32_t)(ms - next_board_announce_ms) >= 0) {
-            EngineSensors snap;
-            sensors_snapshot(&snap);
-            custom_can_node_publish_board_announce(snap.rpm,
-                                                   (uint8_t)state,
-                                                   armed,
-                                                   fc_alive);
-            next_board_announce_ms += CUSTOM_CAN_BOARD_ANNOUNCE_MS;
-        }
+        // Important FC-bus rule: when no debug probe is present, transmit exactly
+        // the same traffic family as the original FC-only firmware: DroneCAN node
+        // status + ESC status only. The custom 0x1CEB.... debug frames are not
+        // DroneCAN transfers; leaving them on the bus makes PX4/UAVCAN report CAN
+        // transfer/status errors. A debug probe heartbeat enables these frames.
+        if (debug_alive) {
+            if ((int32_t)(ms - next_board_announce_ms) >= 0) {
+                EngineSensors snap;
+                sensors_snapshot(&snap);
+                custom_can_node_publish_board_announce(snap.rpm,
+                                                       (uint8_t)state,
+                                                       armed,
+                                                       fc_alive);
+                next_board_announce_ms += CUSTOM_CAN_BOARD_ANNOUNCE_MS;
+            }
 
-        uint16_t custom_a_ms = CUSTOM_CAN_TELEM_A_PERIOD_MS;
-        uint16_t custom_b_ms = CUSTOM_CAN_TELEM_B_PERIOD_MS;
-        uint16_t custom_c_ms = CUSTOM_CAN_TELEM_C_PERIOD_MS;
-        custom_can_node_get_telem_periods(&custom_a_ms, &custom_b_ms, &custom_c_ms);
+            uint16_t custom_a_ms = CUSTOM_CAN_TELEM_A_PERIOD_MS;
+            uint16_t custom_b_ms = CUSTOM_CAN_TELEM_B_PERIOD_MS;
+            uint16_t custom_c_ms = CUSTOM_CAN_TELEM_C_PERIOD_MS;
+            custom_can_node_get_telem_periods(&custom_a_ms, &custom_b_ms, &custom_c_ms);
 
-        if ((int32_t)(ms - next_custom_telem_a_ms) >= 0) {
-            EngineSensors snap;
-            sensors_snapshot(&snap);
-            custom_can_node_publish_telem_a(snap.rpm,
-                                            engine_control_get_output_us(),
-                                            (uint8_t)state,
-                                            debug_cmd_alive,
-                                            armed,
-                                            snap.stationary);
-            next_custom_telem_a_ms += custom_a_ms;
-        }
+            if ((int32_t)(ms - next_custom_telem_a_ms) >= 0) {
+                EngineSensors snap;
+                sensors_snapshot(&snap);
+                custom_can_node_publish_telem_a(snap.rpm,
+                                                engine_control_get_output_us(),
+                                                (uint8_t)state,
+                                                debug_cmd_alive,
+                                                armed,
+                                                snap.stationary);
+                next_custom_telem_a_ms += custom_a_ms;
+            }
 
-        if ((int32_t)(ms - next_custom_telem_b_ms) >= 0) {
-            custom_can_node_publish_telem_b(engine_control_get_target_rpm(),
-                                            (uint16_t)engine_control_get_feedforward_us(),
-                                            engine_control_get_pid_correction_us());
-            next_custom_telem_b_ms += custom_b_ms;
-        }
+            if ((int32_t)(ms - next_custom_telem_b_ms) >= 0) {
+                custom_can_node_publish_telem_b(engine_control_get_target_rpm(),
+                                                (uint16_t)engine_control_get_feedforward_us(),
+                                                engine_control_get_pid_correction_us());
+                next_custom_telem_b_ms += custom_b_ms;
+            }
 
-        if ((int32_t)(ms - next_custom_telem_c_ms) >= 0) {
-            EngineSensors snap;
-            sensors_snapshot(&snap);
-            custom_can_node_publish_telem_c(snap.temperature_c,
-                                            snap.current_a,
-                                            snap.bus_voltage_v,
-                                            sensors_get_runtime_ms());
-            next_custom_telem_c_ms += custom_c_ms;
-        }
+            if ((int32_t)(ms - next_custom_telem_c_ms) >= 0) {
+                EngineSensors snap;
+                sensors_snapshot(&snap);
+                custom_can_node_publish_telem_c(snap.temperature_c,
+                                                snap.current_a,
+                                                snap.bus_voltage_v,
+                                                sensors_get_runtime_ms());
+                next_custom_telem_c_ms += custom_c_ms;
+            }
 
-        if ((int32_t)(ms - next_auto_status_ms) >= 0) {
-            const bool active = engine_control_endpoint_auto_active();
-            custom_can_node_publish_auto_status(engine_control_endpoint_auto_is_max()
-                                                    ? CUSTOM_CAN_AUTO_ENDPOINT_MAX
-                                                    : CUSTOM_CAN_AUTO_ENDPOINT_IDLE,
-                                                active,
-                                                engine_control_endpoint_auto_target_rpm(),
-                                                engine_control_endpoint_auto_us(),
-                                                engine_control_endpoint_auto_error_rpm());
-            HallAutoCalStatus hall_cal_status;
-            sensors_get_hall_auto_cal_status(&hall_cal_status);
-            custom_can_node_publish_hall_cal_status(&hall_cal_status);
-            next_auto_status_ms += CUSTOM_CAN_AUTO_STATUS_PERIOD_MS;
+            if ((int32_t)(ms - next_auto_status_ms) >= 0) {
+                const bool active = engine_control_endpoint_auto_active();
+                custom_can_node_publish_auto_status(engine_control_endpoint_auto_is_max()
+                                                        ? CUSTOM_CAN_AUTO_ENDPOINT_MAX
+                                                        : CUSTOM_CAN_AUTO_ENDPOINT_IDLE,
+                                                    active,
+                                                    engine_control_endpoint_auto_target_rpm(),
+                                                    engine_control_endpoint_auto_us(),
+                                                    engine_control_endpoint_auto_error_rpm());
+                HallAutoCalStatus hall_cal_status;
+                sensors_get_hall_auto_cal_status(&hall_cal_status);
+                custom_can_node_publish_hall_cal_status(&hall_cal_status);
+                next_auto_status_ms += CUSTOM_CAN_AUTO_STATUS_PERIOD_MS;
+            }
+        } else {
+            // Keep first debug packets snappy when a probe is plugged in later.
+            next_board_announce_ms = ms;
+            next_custom_telem_a_ms = ms;
+            next_custom_telem_b_ms = ms;
+            next_custom_telem_c_ms = ms;
+            next_auto_status_ms = ms;
         }
 
         if (engine_control_consume_config_dirty() ||
@@ -295,9 +314,17 @@ int main(void)
         }
 
         if (config_save_pending && (int32_t)(ms - next_config_save_ms) >= 0) {
-            const bool saved = persistent_config_save_from_runtime();
-            printf("FRAM settings save %s\r\n", saved ? "OK" : "FAILED");
-            config_save_pending = false;
+            const EngineState save_state = engine_control_get_state();
+            if (save_state == ENGINE_PRIMING_AFTER_SPIN) {
+                // Do not start an I2C/FRAM transaction during the electrically
+                // noisy post-spin priming window. Runtime changes are already live;
+                // persistence waits until the engine leaves priming.
+                next_config_save_ms = ms + 500u;
+            } else {
+                const bool saved = persistent_config_save_from_runtime();
+                printf("FRAM settings save %s\r\n", saved ? "OK" : "FAILED");
+                config_save_pending = false;
+            }
         }
 
         dronecan_node_process_tx();

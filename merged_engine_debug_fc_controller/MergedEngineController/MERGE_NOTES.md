@@ -185,3 +185,17 @@ node_id = DRONECAN_NODE_ID_BASE + board_id
 With the default base of 40, board ID 6 publishes as DroneCAN node 46. If the
 saved board ID is still a large random discovery ID, the firmware falls back to
 the original node ID 42 until you assign a small board ID from the GUI.
+
+## v20 square-wave timestamp synchronization and PWM overlay
+
+- The square-wave snapshot no longer draws an ideal command from nominal phase
+  times. The GUI timestamps each successful `CMD` write to the USB/CAN bridge,
+  reconstructs the transmitted step trace, and centers each RPM snapshot on the
+  actual high-pulse edges.
+- The square-wave status reports the latest maximum edge delay relative to the
+  requested phase. With the normal 100 ms GUI heartbeat this exposes scheduler
+  quantization instead of hiding it in an ideal plot.
+- The newest snapshot plots controller-reported `TEL A out_us` on a third axis.
+  That PWM axis is fixed at 1000 us on the bottom and 2000 us on the top, so the
+  transmitted percentage command, measured servo PWM, and RPM response can be
+  compared on the same time base.

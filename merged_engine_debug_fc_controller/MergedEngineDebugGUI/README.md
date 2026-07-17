@@ -1,147 +1,104 @@
 # Engine CAN Tuning GUI
 
-Desktop Python GUI for the RP2040 USB↔CAN bridge.
+Desktop Python GUI for the RP2040 USB↔CAN bridge and merged engine controller.
 
-## Features
+## Current features
 
-- Connect/disconnect to the bridge over USB CDC serial.
-- Settings panel with live telemetry sampling-period control (`RATE A B C`) for CAN streams.
-- Persistent `engine_gui_settings.json` file that reloads serial, tuning, sweep, square-wave, and telemetry-rate fields on the next launch.
-- ARM / DISARM / panic zero+disarm.
-- Continuous command heartbeat, matching the motor firmware watchdog.
-- Manual throttle slider.
-- One-shot throttle ramp sweep with configurable start, end, and duration.
-- Separate feedforward calibration sweep window that captures RPM vs commanded throttle and exports a dedicated calibration CSV.
-- Two endpoint auto-calibration buttons: command 0% or 100% throttle, average measured RPM for 10 s, write that average into the matching feedforward RPM endpoint, and resend tuning.
-- Square-wave PID tuning mode with configurable minimum, maximum, and full-cycle period.
-- Separate period-snapshot window that overlays RPM responses with the centered throttle pulse; older captured periods fade for easier comparison.
-- Live PID and feedforward tuning packets.
-- RPM time graph.
-- Live target/feedforward/PID/temperature/current/bus/runtime display.
-- CSV telemetry export.
+- Select, identify, arm, disarm, and panic-stop one engine board at a time.
+- Continuous selected-board command heartbeat and maintained exact-PWM bypass.
+- Live RPM, output PWM, target RPM, feedforward PWM, PID correction, temperature, current, voltage, and runtime.
+- PID/startup/Hall-threshold configuration with FRAM pull and save.
+- Main-page **0% throttle PWM** quick adjustment plus a dedicated **Feedforward calibration + fitting** window with explicit per-engine Pull and atomic live Send/Commit.
+- Linear, polynomial order 1–3, and piecewise-linear feedforward models.
+- Indefinite 0% and 100% endpoint searches: start at a chosen PWM, slowly approach the target RPM, then capture only when the operator presses the capture button.
+- Automatic intermediate-point search with configurable range, search rate, deadband, stable time, sample time, and per-point timeout.
+- Timed direct-PWM sweep that records measured RPM/PWM points without writing the engine model.
+- Editable point table, include/exclude controls, manual point entry, CSV import/export, point erase, fit RMSE/max error, and graph overlay.
+- Unsaved-field highlighting, selected-engine identity checks, staged-transfer cancellation, and controller pull-back verification after commit.
+- Square-wave PID snapshots synchronized to the actual transmitted `CMD` timestamps.
+- RPM-triggered single-shot oscilloscope with synchronized RPM, command, and measured PWM traces.
+- CSV telemetry export and configurable telemetry periods.
 
-## Install
+## Install and run
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python3 engine_tuning_gui.py
 ```
 
-On some Linux systems, install Tk support if it is missing:
+Tk must also be installed with Python. On Debian/Ubuntu, use `sudo apt install python3-tk` when needed.
 
-```bash
-sudo dnf install python3-tkinter
-# or on Debian/Ubuntu:
-sudo apt install python3-tk
-```
+## Safe feedforward workflow
 
-## Expected bridge text protocol
+1. Connect the probe and select exactly one engine.
+2. Open **Feedforward calibration + fitting**.
+3. Press **Pull model from selected engine**. Pulled points appear as excluded reference points so old model data is not silently mixed into a new fit.
+4. Arm the selected engine from the main window.
+5. Capture endpoints, run intermediate calibration, run a sweep, load CSV data, or enter points manually.
+6. Enable only the points that should influence the fit.
+7. Choose the model and parameters, then press **Fit / preview local points**.
+8. Review the graph, PWM range, monotonic direction, RMSE, and maximum point error.
+9. Press **SEND + LIVE COMMIT to selected engine**. The GUI names the board again before confirmation. The engine may remain running; the controller preserves the current PWM while transferring the model.
+10. Wait for **COMMIT VERIFIED**. The GUI pulls the active model back and compares the RPM endpoints and coefficients/knots with what was sent.
 
-The bridge accepts lines such as:
+Calibration and fitting are local until the final commit. Incomplete transactions do not alter the active model. A board change, serial-write failure, explicit cancel, or five-second controller staging timeout clears an incomplete transfer.
 
-```text
-CMD 1 25.0
-PID 0.035 0.012 0.000 175
-FF0 2200 1850
-FF100 4250 1450
-RATE 10 20 200
-```
+## Feedforward models
 
-It emits telemetry lines such as:
+The independent variable is normalized throttle command, `x = throttle_percent / 100`.
 
-```text
-TEL A rpm=2198.392 out_us=1848 state=4 flags=3
-TEL B target_rpm=2200.000 ff_us=1850 pid_us=1.2
-TEL C temp_c=25.3 current_a=0.114 vbus_v=11.983 runtime_s=72
-```
+- **Linear:** two endpoint knots with interpolation.
+- **Polynomial:** `PWM_us = c0 + c1*x + c2*x^2 + c3*x^3`, limited to order 1–3.
+- **Piecewise linear:** 2–12 ordered knots spanning exactly 0% through 100%.
 
-## Square-wave tuning window
+The current engine installation opens throttle as PWM decreases. The GUI anchors every fit exactly to the enabled 0% and 100% calibration points, then rejects a curve unless it remains within 1000–2000 µs and decreases monotonically from 0% to 100%. The controller independently repeats range and monotonic validation before applying a commit.
 
-The square-wave mode uses a 50% high-duty pulse centered inside each full period:
+## Calibration modes
 
-- first quarter-period at the minimum throttle,
-- middle half-period at the maximum throttle,
-- final quarter-period back at the minimum throttle.
+### Endpoint calibration
 
-That phase choice makes each captured period line up cleanly in the snapshot window, with the high-throttle pulse visually centered at `t = 0`. The GUI stores the 12 most recent completed periods and fades older RPM traces automatically.
+**Start 0% calibration** or **Start 100% calibration** begins from the configured starting PWM and slowly searches toward the corresponding target RPM. It runs for an unlimited time. Press **Capture current endpoint + stop** when the result is stable, or abort without capturing.
 
-## Telemetry sampling settings
+### Intermediate calibration
 
-The Settings window sends `RATE A B C` to the bridge, which forwards a custom CAN rate frame to the motor controller. The three values are telemetry periods in milliseconds:
+The GUI generates targets between the selected minimum and maximum percentages, converts each percentage to a target RPM using the 0%/100% RPM endpoints, slowly searches PWM, waits inside the RPM deadband, averages for the configured sample time, and advances to the next point. A per-point timeout aborts a point that cannot settle.
 
-- `A`: RPM, output pulse, engine state, flags.
-- `B`: target RPM, feedforward pulse, PID correction.
-- `C`: temperature, current, bus voltage, runtime.
+### Direct-PWM sweep
 
-Lower period values mean a higher CAN/serial sample rate. For PID tuning, reducing `A` first is usually the most valuable.
+The sweep moves from the configured start PWM to end PWM over the total time. Incoming RPM samples are normalized using the target-RPM endpoints and plotted as local sweep points. Sweep data is never written automatically.
 
-## Feedforward calibration sweep
+## Square-wave synchronization
 
-The calibration window runs an independent start→end throttle sweep and captures `command_throttle_pct` against measured RPM, plus controller-side output/target/feedforward/PID columns. Save that CSV to fit or manually choose better 0% and 100% feedforward endpoints.
+The square-wave snapshot timestamps each successful serial `CMD` write instead of drawing ideal scheduled edges. It overlays measured RPM, actual transmitted command timing, and controller-reported output PWM. The PWM axis is fixed to 1000–2000 µs.
 
-## Automatic feedforward endpoint RPM capture
+## RPM-triggered oscilloscope
 
-The two auto-set buttons in the PID/feedforward panel hold the existing throttle command endpoint and average incoming `TEL A` RPM samples for 10 seconds:
+Enter a rising-edge RPM trigger and a total window width. The scope captures half the width before the crossing and half after it, with synchronized RPM, transmitted throttle command, and controller output PWM.
 
-- **0% button:** commands the existing 0%/idle throttle opening, averages RPM for 10 s, writes the result into `0% RPM`, then reapplies tuning.
-- **100% button:** commands the existing 100% throttle opening, averages RPM for 10 s, writes the result into `100% RPM`, then reapplies tuning.
+## Maintained PWM bypass
 
-These buttons update the **RPM endpoints only**. The throttle-servo microsecond openings remain whatever is currently entered in `0% us` and `100% us`. A cancel button stops the capture and forces commanded throttle back to 0%.
+Bypass requires the selected engine to be armed. The GUI and probe maintain the exact PWM periodically. Disarm, panic, selection change, calibration abort, popup close, or `PWMBYPASS_STOP` clears bypass.
 
-## v2 multi-engine/debug-probe additions
+## Firmware requirement
 
-The GUI now understands the merged controller/probe protocol:
+This fitting release changes the GUI, USB↔CAN debug probe protocol, controller runtime model, and FRAM record version. Rebuild and flash both:
 
-- Board discovery through `BOARD id=...` announcements.
-- Board selector by startup board ID.
-- Blink/beep selected engine and startup beep before all-engine calibration steps.
-- Panic all engines.
-- Existing PID, feedforward, sweep, square-wave, telemetry, CSV, and endpoint-RPM averaging features are kept.
-- New endpoint servo-opening auto-adjust buttons:
-  - **Auto-adjust selected 0% us to 0% RPM** sends `AUTO0` using the `0% RPM` target.
-  - **Auto-adjust selected 100% us to 100% RPM** sends `AUTO100` using the `100% RPM` target.
-  - The controller slowly changes the endpoint servo microsecond value itself, and the GUI updates the visible `0% us` / `100% us` field from `AUTO` status frames.
-- Clockwise all-board buttons run the discovered board list in sorted-ID order, beeping/blinking each selected engine before starting its endpoint auto-adjust dwell.
+- `MergedEngineController`
+- `MergedEngineDebugProbe`
 
-Do not use the debug probe in flight; the merged firmware treats a live probe as an intentional FC override.
+Old FRAM v3/v4 records are migrated to a two-point linear model using their saved endpoints. Disconnect the debug probe before flight-controller operation because a live probe intentionally overrides DroneCAN commands.
 
-## v8 GUI notes
+## Endpoint sweep behavior
 
-- `Beep + flash selected` starts the manual locator pattern on the selected engine.
-- `Stop blink/beep` sends the stop command several times; it only stops the manual locator, not normal ARM/status beeps.
-- `ARM` now clears any active Hall/endpoint auto mode before sending the arm heartbeat, which prevents a previous calibration routine from trapping the board in calibration mode.
-- Hall auto-calibration runs until the board reports stable raw Hall min/max windows. Keep the external spinner steady at the target RPM and abort from the popup if needed.
+The direct-PWM fitting sweep always uses the selected engine's exact 0% and 100% PWM endpoints. It holds 0%, ramps without extrapolation or overshoot, holds 100%, then returns to 0%. During the ramp, measured RPM is normalized between the exact configured 0% and 100% RPM targets and used as the throttle-position x-axis. This recovers the nonlinear throttle curve instead of plotting the intentionally linear PWM ramp. Exact endpoint anchors are inserted separately; the source text retains the actual measured endpoint RPM.
 
-## v9 behavior
+## Priming reset diagnostics
 
-Before arming, identifying, servo testing, or Hall auto-calibrating, the GUI explicitly re-selects the current board ID. This avoids a common failure mode where the GUI still shows a board, but the USB-CAN probe was reset or left in broadcast mode, so the controller rejects `CMD 1 ...` and immediately reports disarmed.
+The GUI warns when selected-board uptime moves backward. Controller USB diagnostics report whether the RP2040 watchdog caused the last reset. A Hall-period interrupt race that could make RPM disappear and trigger the two-second zero-RPM state fallback has been removed. FRAM writes are deferred during starter/priming states.
 
-## v11 ARM-drop fix
 
-The GUI now ignores stale inactive `HALLCAL DONE_OK/FAILED` telemetry for manual ARM/disarm state. Only a Hall-calibration process that this GUI started is allowed to clear `command_armed` on completion/failure. This prevents old Hall-cal status packets from disarming the board immediately after pressing ARM.
+## Main-page field protection
 
-## v14 edit-protection behavior
-
-The GUI now protects configuration fields while the user is editing them. If a
-CAN/FRAM refresh, endpoint auto-tune status, Hall calibration result, or saved
-settings refresh arrives while the cursor is inside a bound entry field, the GUI
-keeps the user's typed value and skips that live overwrite. The user can then
-press the relevant Apply button to send the edited value to the board/FRAM.
-
-This protection applies to the main tuning fields and the direct PWM popup
-because both use the same Tk text variables.
-
-## v15 GUI telemetry fallback
-
-If selecting a board temporarily stops full `TEL A/B/C` telemetry, the GUI now uses the selected board's `BOARD` announcement as a fallback source for RPM/state/live-link updates. The status link shows `LIVE TEL` when full telemetry is fresh and `LIVE BOARD` when the fallback is feeding the graph.
-
-## v16 GUI fixes
-
-- Selecting a board from the drop-down now immediately sends several `SELECT`
-  frames plus a `PROBE`, and clears stale TEL-A freshness so BOARD announcements
-  can keep the live values and graph moving while TEL-A resumes.
-- `Stop endpoint auto-adjust` now sends `AUTO_STOP` and commands 0% throttle
-  while preserving the current ARM state. Use Disarm/Panic if you want to remove
-  arm state.
+Main-page configuration entries are now transactional. Typing marks a field yellow and prevents stale CFG/AUTO telemetry from replacing it after focus moves to the Send button. Send commands are automatically retried and verified with GETCFG; the pending highlight clears only when the selected controller reports the same value. An explicit Pull can replace current fields, but typing after Pull immediately protects that field again.

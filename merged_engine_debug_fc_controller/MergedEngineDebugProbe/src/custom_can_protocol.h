@@ -22,6 +22,11 @@
 #define CUSTOM_CAN_ID_RPM_THRESH       0x1CEB0022u
 #define CUSTOM_CAN_ID_START_CONFIG     0x1CEB0023u
 #define CUSTOM_CAN_ID_MANUAL_PWM_TEST  0x1CEB0024u
+#define CUSTOM_CAN_ID_FF_MODEL_META     0x1CEB0025u
+#define CUSTOM_CAN_ID_FF_MODEL_COEFF    0x1CEB0026u
+#define CUSTOM_CAN_ID_FF_MODEL_POINT    0x1CEB0027u
+#define CUSTOM_CAN_ID_FF_MODEL_COMMIT   0x1CEB0028u
+#define CUSTOM_CAN_ID_FF_MODEL_RPM      0x1CEB0029u
 #define CUSTOM_CAN_ID_TELEM_RATE       0x1CEB0030u
 
 #define CUSTOM_CAN_ID_TELEM_A          0x1CEB0100u
@@ -35,6 +40,9 @@
 #define CUSTOM_CAN_ID_CONFIG_FF_IDLE    0x1CEB0115u
 #define CUSTOM_CAN_ID_CONFIG_FF_MAX     0x1CEB0116u
 #define CUSTOM_CAN_ID_CONFIG_MISC       0x1CEB0117u
+#define CUSTOM_CAN_ID_CONFIG_FF_MODEL_META  0x1CEB0118u
+#define CUSTOM_CAN_ID_CONFIG_FF_MODEL_COEFF 0x1CEB0119u
+#define CUSTOM_CAN_ID_CONFIG_FF_MODEL_POINT 0x1CEB011Au
 
 #define CUSTOM_CAN_BROADCAST_BOARD_ID  0xFFFFFFFFu
 
@@ -120,6 +128,18 @@
 //   byte 2..3: exact throttle PWM in microseconds
 //   byte 4..7: reserved
 #define CUSTOM_CAN_MANUAL_PWM_BYPASS_ENABLE 0x01u
+
+// Atomic feedforward-model staging. META starts a new staging transaction;
+// COEFF/POINT fill it; COMMIT validates and applies it to runtime/FRAM. Partial
+// staging never changes the active engine model.
+#define CUSTOM_CAN_FF_MODEL_LINEAR      0u
+#define CUSTOM_CAN_FF_MODEL_POLYNOMIAL  1u
+#define CUSTOM_CAN_FF_MODEL_PIECEWISE   2u
+#define CUSTOM_CAN_FF_MODEL_ACTION_COMMIT 1u
+#define CUSTOM_CAN_FF_MODEL_ACTION_RESET  2u
+#define CUSTOM_CAN_FF_MODEL_ACTION_CANCEL 3u
+#define CUSTOM_CAN_FF_MODEL_MAX_POINTS 12u
+#define CUSTOM_CAN_FF_MODEL_MAX_POLY_ORDER 3u
 
 // HALL_CAL_STATUS payload, 8 bytes:
 //   byte 0: status 0=idle, 1=running, 2=done_ok, 3=failed/aborted

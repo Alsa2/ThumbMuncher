@@ -96,11 +96,11 @@
 // Requested throttle/RPM feedforward curve
 //   0%   -> 1900 us -> 1800 RPM
 //   100% -> 1450 us -> 4250 RPM
-// PID adds a bounded correction around the feedforward PWM.
+// PID starts from feedforward but may correct across the full 1000..2000 us servo range.
 // -----------------------------------------------------------------------------
 #define THROTTLE_IDLE_RPM               2200.0f
 #define THROTTLE_MAX_RPM                4250.0f
-#define RPM_PID_CORRECTION_LIMIT_US     175.0f
+#define RPM_PID_CORRECTION_LIMIT_US     1000.0f
 #define RPM_PID_KP_US_PER_RPM           0.035f
 #define RPM_PID_KI_US_PER_RPM_S         0.012f
 #define RPM_PID_KD_US_PER_RPM_PER_S     0.000f

@@ -24,6 +24,9 @@
 #ifndef CUSTOM_CAN_IDENTIFY_MS
 #define CUSTOM_CAN_IDENTIFY_MS 3000u
 #endif
+#ifndef CUSTOM_CAN_FF_MODEL_STAGE_TIMEOUT_US
+#define CUSTOM_CAN_FF_MODEL_STAGE_TIMEOUT_US 5000000ull
+#endif
 
 static bool g_selected = false;
 static bool g_armed = false;
@@ -41,6 +44,35 @@ static bool g_servo_test_requested = false;
 static bool g_start_beep_requested = false;
 static bool g_stop_auto_requested = false;
 static bool g_config_dirty = false;
+static EngineFeedforwardModelConfig g_ff_model_stage;
+static bool g_ff_model_stage_active = false;
+static uint16_t g_ff_model_point_mask = 0u;
+static uint8_t g_ff_model_coeff_mask = 0u;
+static float g_ff_model_idle_rpm = 0.0f;
+static float g_ff_model_max_rpm = 0.0f;
+static bool g_ff_model_rpm_received = false;
+static uint64_t g_ff_model_stage_last_us = 0u;
+
+static void clear_ff_model_stage(void)
+{
+    memset(&g_ff_model_stage, 0, sizeof(g_ff_model_stage));
+    g_ff_model_stage_active = false;
+    g_ff_model_point_mask = 0u;
+    g_ff_model_coeff_mask = 0u;
+    g_ff_model_idle_rpm = 0.0f;
+    g_ff_model_max_rpm = 0.0f;
+    g_ff_model_rpm_received = false;
+    g_ff_model_stage_last_us = 0u;
+}
+
+static void expire_ff_model_stage(uint64_t now_us)
+{
+    if (g_ff_model_stage_active && g_ff_model_stage_last_us != 0u &&
+        now_us - g_ff_model_stage_last_us > CUSTOM_CAN_FF_MODEL_STAGE_TIMEOUT_US) {
+        clear_ff_model_stage();
+        g_config_reject_count++;
+    }
+}
 
 static float g_pid_kp = RPM_PID_KP_US_PER_RPM;
 static float g_pid_ki = RPM_PID_KI_US_PER_RPM_S;
@@ -170,6 +202,29 @@ static void publish_config_snapshot(void)
     custom_can_le16_store(&data[4], high_raw);
     custom_can_le16_store(&data[6], low_raw);
     transmit_frame(CUSTOM_CAN_ID_CONFIG_MISC, data, 8u);
+
+    EngineFeedforwardModelConfig model;
+    engine_control_get_feedforward_model(&model);
+    memset(data, 0, sizeof(data));
+    data[0] = model.model_type;
+    data[1] = model.point_count;
+    data[2] = model.polynomial_order;
+    data[3] = ENGINE_FF_MAX_POINTS;
+    transmit_frame(CUSTOM_CAN_ID_CONFIG_FF_MODEL_META, data, 8u);
+
+    for (uint8_t i = 0u; i <= ENGINE_FF_MAX_POLY_ORDER; ++i) {
+        memset(data, 0, sizeof(data));
+        data[0] = i;
+        custom_can_float_store(&data[2], model.coefficients[i]);
+        transmit_frame(CUSTOM_CAN_ID_CONFIG_FF_MODEL_COEFF, data, 6u);
+    }
+    for (uint8_t i = 0u; i < model.point_count && i < ENGINE_FF_MAX_POINTS; ++i) {
+        memset(data, 0, sizeof(data));
+        data[0] = i;
+        custom_can_le16_store(&data[2], model.point_pct_x100[i]);
+        custom_can_le16_store(&data[4], model.point_us[i]);
+        transmit_frame(CUSTOM_CAN_ID_CONFIG_FF_MODEL_POINT, data, 6u);
+    }
 }
 
 void custom_can_node_init(void)
@@ -186,6 +241,7 @@ void custom_can_node_init(void)
     reset_to_safe_unselected();
     g_last_debug_us = 0u;
     g_config_reject_count = 0u;
+    clear_ff_model_stage();
     g_telem_a_ms = CUSTOM_CAN_TELEM_A_PERIOD_MS;
     g_telem_b_ms = CUSTOM_CAN_TELEM_B_PERIOD_MS;
     g_telem_c_ms = CUSTOM_CAN_TELEM_C_PERIOD_MS;
@@ -208,6 +264,8 @@ void custom_can_node_handle_frame(const CanardCANFrame *frame, uint64_t timestam
     if (frame == NULL) {
         return;
     }
+
+    expire_ff_model_stage(timestamp_usec);
 
     if (frame_id_is(frame, CUSTOM_CAN_ID_PROBE)) {
         mark_debug_seen(timestamp_usec);
@@ -519,6 +577,98 @@ void custom_can_node_handle_frame(const CanardCANFrame *frame, uint64_t timestam
         if (!sensors_set_hall_thresholds_raw(high_raw, low_raw)) {
             g_config_reject_count++;
         }
+        return;
+    }
+
+    if (frame_id_is(frame, CUSTOM_CAN_ID_FF_MODEL_META) && frame->data_len >= 3u) {
+        mark_debug_seen(timestamp_usec);
+        if (!accepts_selected_command()) return;
+        clear_ff_model_stage();
+        g_ff_model_stage.model_type = frame->data[0];
+        g_ff_model_stage.point_count = frame->data[1];
+        g_ff_model_stage.polynomial_order = frame->data[2];
+        g_ff_model_stage_active = true;
+        g_ff_model_stage_last_us = timestamp_usec;
+        return;
+    }
+
+    if (frame_id_is(frame, CUSTOM_CAN_ID_FF_MODEL_RPM) && frame->data_len >= 8u) {
+        mark_debug_seen(timestamp_usec);
+        if (!accepts_selected_command() || !g_ff_model_stage_active) return;
+        g_ff_model_idle_rpm = custom_can_float_load(&frame->data[0]);
+        g_ff_model_max_rpm = custom_can_float_load(&frame->data[4]);
+        g_ff_model_rpm_received = isfinite(g_ff_model_idle_rpm) && isfinite(g_ff_model_max_rpm);
+        g_ff_model_stage_last_us = timestamp_usec;
+        return;
+    }
+
+    if (frame_id_is(frame, CUSTOM_CAN_ID_FF_MODEL_COEFF) && frame->data_len >= 6u) {
+        mark_debug_seen(timestamp_usec);
+        if (!accepts_selected_command() || !g_ff_model_stage_active) return;
+        const uint8_t index = frame->data[0];
+        if (index > ENGINE_FF_MAX_POLY_ORDER) { g_config_reject_count++; return; }
+        g_ff_model_stage.coefficients[index] = custom_can_float_load(&frame->data[2]);
+        g_ff_model_coeff_mask |= (uint8_t)(1u << index);
+        g_ff_model_stage_last_us = timestamp_usec;
+        return;
+    }
+
+    if (frame_id_is(frame, CUSTOM_CAN_ID_FF_MODEL_POINT) && frame->data_len >= 6u) {
+        mark_debug_seen(timestamp_usec);
+        if (!accepts_selected_command() || !g_ff_model_stage_active) return;
+        const uint8_t index = frame->data[0];
+        if (index >= ENGINE_FF_MAX_POINTS) { g_config_reject_count++; return; }
+        g_ff_model_stage.point_pct_x100[index] = custom_can_le16_load(&frame->data[2]);
+        g_ff_model_stage.point_us[index] = custom_can_le16_load(&frame->data[4]);
+        g_ff_model_point_mask |= (uint16_t)(1u << index);
+        g_ff_model_stage_last_us = timestamp_usec;
+        return;
+    }
+
+    if (frame_id_is(frame, CUSTOM_CAN_ID_FF_MODEL_COMMIT) && frame->data_len >= 1u) {
+        mark_debug_seen(timestamp_usec);
+        if (!accepts_selected_command()) return;
+        const uint8_t action = frame->data[0];
+        if (action == CUSTOM_CAN_FF_MODEL_ACTION_CANCEL) {
+            clear_ff_model_stage();
+            return;
+        }
+        if (action == CUSTOM_CAN_FF_MODEL_ACTION_RESET) {
+            // Model resets are safe while running: engine_control applies the new
+            // curve with bumpless PID tracking and preserves the current PWM.
+            EngineControlRuntimeConfig cfg;
+            EngineFeedforwardModelConfig model;
+            engine_control_get_runtime_config(&cfg);
+            engine_control_make_default_feedforward_model(&model, cfg.idle_us, cfg.max_us);
+            if (!engine_control_set_feedforward_model(&model)) g_config_reject_count++;
+            clear_ff_model_stage();
+            return;
+        }
+        if (action != CUSTOM_CAN_FF_MODEL_ACTION_COMMIT || !g_ff_model_stage_active) {
+            g_config_reject_count++;
+            return;
+        }
+        // COMMIT is atomic and may be applied while the engine is running. The
+        // controller performs a bumpless transfer and keeps the existing actuator
+        // output at the instant the staged model becomes active.
+        bool complete = true;
+        if (!g_ff_model_rpm_received) {
+            complete = false;
+        } else if (g_ff_model_stage.model_type == ENGINE_FF_MODEL_POLYNOMIAL &&
+                   g_ff_model_stage.polynomial_order >= 1u &&
+                   g_ff_model_stage.polynomial_order <= ENGINE_FF_MAX_POLY_ORDER) {
+            const uint8_t required = (uint8_t)((1u << (g_ff_model_stage.polynomial_order + 1u)) - 1u);
+            complete = (g_ff_model_coeff_mask & required) == required;
+        } else if (g_ff_model_stage.point_count >= 2u && g_ff_model_stage.point_count <= ENGINE_FF_MAX_POINTS) {
+            const uint16_t required = (uint16_t)((1u << g_ff_model_stage.point_count) - 1u);
+            complete = (g_ff_model_point_mask & required) == required;
+        } else {
+            complete = false;
+        }
+        if (!complete || !engine_control_set_feedforward_fit(g_ff_model_idle_rpm, g_ff_model_max_rpm, &g_ff_model_stage)) {
+            g_config_reject_count++;
+        }
+        clear_ff_model_stage();
         return;
     }
 

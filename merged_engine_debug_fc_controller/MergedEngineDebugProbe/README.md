@@ -46,3 +46,6 @@ This patch adds:
 - verify commanding your output above ~1% starts the cranker only on the selected node
 - verify the choke opens after 15 counted turns
 - verify `rpm`, `temp_c`, `current_a`, `runtime_s`, and `state` KeyValue messages appear on the bus
+## Fitted feedforward serial commands
+
+`FFMODEL`, `FFRPM`, `FFCOEFF`, `FFPOINT`, `FFCOMMIT`, `FFRESET`, and `FFCANCEL` forward the atomic model transaction to the currently selected engine. `GETCFG` now prints `CFG FFMODEL`, `CFG FFCOEFF`, and `CFG FFPOINT` lines for GUI pull-back verification. Reflash this probe together with the updated controller.

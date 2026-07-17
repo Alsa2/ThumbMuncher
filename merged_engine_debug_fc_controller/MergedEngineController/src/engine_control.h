@@ -4,6 +4,28 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#define ENGINE_FF_MAX_POINTS 12u
+#define ENGINE_FF_MAX_POLY_ORDER 3u
+
+typedef enum {
+    ENGINE_FF_MODEL_LINEAR = 0,
+    ENGINE_FF_MODEL_POLYNOMIAL = 1,
+    ENGINE_FF_MODEL_PIECEWISE_LINEAR = 2,
+} EngineFeedforwardModelType;
+
+typedef struct {
+    uint8_t model_type;
+    uint8_t point_count;
+    uint8_t polynomial_order;
+    uint8_t reserved;
+    // Polynomial models use x = throttle_pct / 100.0 and
+    // us = c0 + c1*x + c2*x^2 + c3*x^3.
+    float coefficients[ENGINE_FF_MAX_POLY_ORDER + 1u];
+    // Linear and piecewise models use sorted throttle points in centi-percent.
+    uint16_t point_pct_x100[ENGINE_FF_MAX_POINTS];
+    uint16_t point_us[ENGINE_FF_MAX_POINTS];
+} EngineFeedforwardModelConfig;
+
 typedef enum {
     ENGINE_DISARMED = 0,
     ENGINE_ARMED_WAIT_FOR_SPIN,
@@ -27,6 +49,7 @@ typedef struct {
     float correction_limit_us;
     uint16_t start_us;
     uint16_t start_hold_ms;
+    EngineFeedforwardModelConfig feedforward_model;
 } EngineControlRuntimeConfig;
 
 void engine_control_init(void);
@@ -38,6 +61,11 @@ void engine_control_update(uint32_t now_ms);
 bool engine_control_set_pid(float kp, float ki, float kd, float correction_limit_us);
 bool engine_control_set_feedforward_idle(float rpm, uint16_t throttle_us);
 bool engine_control_set_feedforward_max(float rpm, uint16_t throttle_us);
+bool engine_control_set_feedforward_model(const EngineFeedforwardModelConfig *model);
+bool engine_control_set_feedforward_fit(float idle_rpm, float max_rpm, const EngineFeedforwardModelConfig *model);
+void engine_control_get_feedforward_model(EngineFeedforwardModelConfig *out);
+void engine_control_make_default_feedforward_model(EngineFeedforwardModelConfig *out, uint16_t idle_us, uint16_t max_us);
+bool engine_control_feedforward_model_is_valid(const EngineFeedforwardModelConfig *model);
 void engine_control_get_runtime_config(EngineControlRuntimeConfig *out);
 bool engine_control_runtime_config_is_valid(const EngineControlRuntimeConfig *cfg);
 bool engine_control_apply_runtime_config(const EngineControlRuntimeConfig *cfg);

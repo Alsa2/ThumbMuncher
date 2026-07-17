@@ -1,19 +1,32 @@
 {
-  "calibration_sweep": {
-    "duration_s": "20",
-    "end_pct": "100",
-    "start_pct": "0"
-  },
   "endpoint_auto_adjust": {
     "all_board_dwell_s": "15",
     "rate_us_per_s": "25",
     "start_us": "1500"
   },
   "feedforward": {
-    "rpm_0_pct": "1900",
-    "rpm_100_pct": "6300",
-    "us_0_pct": "1913",
-    "us_100_pct": "1000"
+    "rpm_0_pct": "2000.0000",
+    "rpm_100_pct": "6300.0000",
+    "us_0_pct": "1851",
+    "us_100_pct": "1295"
+  },
+  "feedforward_calibration": {
+    "adjust_rate_us_per_s": "25",
+    "intermediate_max_pct": "90",
+    "intermediate_min_pct": "10",
+    "model_type": "Polynomial",
+    "point_count": "7",
+    "point_timeout_s": "45",
+    "polynomial_order": "3",
+    "rpm_deadband": "50",
+    "sample_time_per_point_s": "5",
+    "stable_time_s": "2",
+    "start_us": "1700",
+    "sweep_end_us": "1000",
+    "sweep_endpoint_hold_s": "2",
+    "sweep_start_us": "1913",
+    "sweep_total_s": "30",
+    "use_sweep_points": true
   },
   "graph": {
     "history_seconds": 45.0
@@ -25,15 +38,19 @@
     "kd": "0.0000000",
     "ki": "0.012000000",
     "kp": "0.035000000",
-    "limit_us": "200.00000"
+    "limit_us": "175.00000"
+  },
+  "rpm_scope": {
+    "trigger_rpm": "3000",
+    "width_s": "4"
   },
   "rpm_sensor": {
     "auto_cal_duration_s": "0",
     "auto_cal_target_rpm": "2200",
-    "threshold_high_raw": "575",
-    "threshold_low_raw": "324"
+    "threshold_high_raw": "215",
+    "threshold_low_raw": "83"
   },
-  "serial_port": "/dev/ttyACM0",
+  "serial_port": "/dev/ttyACM1",
   "square_wave": {
     "maximum_pct": "100",
     "minimum_pct": "0",

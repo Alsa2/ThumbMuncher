@@ -21,6 +21,8 @@ static bool g_armed = false;
 static float g_throttle_pct = 0.0f;
 static uint8_t g_command_seq = 0u;
 static uint32_t g_selected_id = 0u;
+static bool g_pwm_bypass_active = false;
+static uint16_t g_pwm_bypass_us = 1500u;
 static char g_line[SERIAL_LINE_MAX];
 static size_t g_line_len = 0u;
 
@@ -68,6 +70,11 @@ static bool send_select(uint32_t board_id)
     uint8_t data[8] = {0};
     custom_can_le32_store(&data[0], board_id);
     data[4] = CUSTOM_CAN_SELECT_FLAG_SELECT;
+    if (g_selected_id != 0u && g_selected_id != board_id) {
+        // A bypass belongs to exactly one selected engine. Never carry it to a
+        // newly selected board.
+        g_pwm_bypass_active = false;
+    }
     g_selected_id = board_id;
     return tx_frame(CUSTOM_CAN_ID_SELECT, data, 8u);
 }
@@ -89,6 +96,7 @@ static bool send_clear_select(void)
     g_selected_id = 0u;
     g_armed = false;
     g_throttle_pct = 0.0f;
+    g_pwm_bypass_active = false;
     return tx_frame(CUSTOM_CAN_ID_SELECT, data, 8u);
 }
 
@@ -135,6 +143,47 @@ static bool send_feedforward_max(float rpm, uint16_t us)
     custom_can_float_store(&data[0], rpm);
     custom_can_le16_store(&data[4], us);
     return tx_frame(CUSTOM_CAN_ID_FF_MAX, data, 8u);
+}
+
+static bool send_ff_model_meta(uint8_t model_type, uint8_t point_count, uint8_t order)
+{
+    uint8_t data[8] = {0};
+    data[0] = model_type;
+    data[1] = point_count;
+    data[2] = order;
+    return tx_frame(CUSTOM_CAN_ID_FF_MODEL_META, data, 8u);
+}
+
+static bool send_ff_model_rpm(float idle_rpm, float max_rpm)
+{
+    uint8_t data[8] = {0};
+    custom_can_float_store(&data[0], idle_rpm);
+    custom_can_float_store(&data[4], max_rpm);
+    return tx_frame(CUSTOM_CAN_ID_FF_MODEL_RPM, data, 8u);
+}
+
+static bool send_ff_model_coeff(uint8_t index, float value)
+{
+    uint8_t data[8] = {0};
+    data[0] = index;
+    custom_can_float_store(&data[2], value);
+    return tx_frame(CUSTOM_CAN_ID_FF_MODEL_COEFF, data, 6u);
+}
+
+static bool send_ff_model_point(uint8_t index, uint16_t pct_x100, uint16_t us)
+{
+    uint8_t data[8] = {0};
+    data[0] = index;
+    custom_can_le16_store(&data[2], pct_x100);
+    custom_can_le16_store(&data[4], us);
+    return tx_frame(CUSTOM_CAN_ID_FF_MODEL_POINT, data, 6u);
+}
+
+static bool send_ff_model_action(uint8_t action)
+{
+    uint8_t data[8] = {0};
+    data[0] = action;
+    return tx_frame(CUSTOM_CAN_ID_FF_MODEL_COMMIT, data, 8u);
 }
 
 static bool send_start_config(uint16_t start_us, uint16_t hold_ms)
@@ -271,7 +320,7 @@ static void handle_line(char *line)
     }
 
     if (strcmp(cmd, "INFO") == 0) {
-        printf("INFO bridge=rp2040_usb_can_debug_probe protocol=custom_can_v2 bitrate=%u selected=%lu commands=PING,INFO,PROBE,SELECT,CLEAR_SELECT,CMD,ARM,THROTTLE,PID,FF0,FF100,STARTCFG,PWMTEST,PWMTEST_STOP,PWMBYPASS,PWMBYPASS_STOP,THRESH,HALLCAL,HALLCAL_STOP,RATE,IDENTIFY,STOP_IDENTIFY,SERVO_TEST,AUTO0,AUTO100,AUTO_STOP,GETCFG,SETID,PANIC_ALL\r\n",
+        printf("INFO bridge=rp2040_usb_can_debug_probe protocol=custom_can_v2 bitrate=%u selected=%lu commands=PING,INFO,PROBE,SELECT,CLEAR_SELECT,CMD,ARM,THROTTLE,PID,FF0,FF100,FFMODEL,FFRPM,FFCOEFF,FFPOINT,FFCOMMIT,FFRESET,FFCANCEL,STARTCFG,PWMTEST,PWMTEST_STOP,PWMBYPASS,PWMBYPASS_STOP,THRESH,HALLCAL,HALLCAL_STOP,RATE,IDENTIFY,STOP_IDENTIFY,SERVO_TEST,AUTO0,AUTO100,AUTO_STOP,GETCFG,SETID,PANIC_ALL\r\n",
                CAN_BITRATE_HZ,
                (unsigned long)g_selected_id);
         return;
@@ -304,6 +353,9 @@ static void handle_line(char *line)
         if (sscanf(args, "%d %f", &armed, &throttle) == 2) {
             g_armed = (armed != 0);
             g_throttle_pct = clampf_local(throttle, 0.0f, 100.0f);
+            if (!g_armed) {
+                g_pwm_bypass_active = false;
+            }
             print_ok_or_busy("CMD", send_selected_command_frame());
         } else {
             printf("ERR BAD_CMD usage=CMD <armed0or1> <throttle_pct>\r\n");
@@ -317,6 +369,7 @@ static void handle_line(char *line)
             g_armed = (armed != 0);
             if (!g_armed) {
                 g_throttle_pct = 0.0f;
+                g_pwm_bypass_active = false;
                 (void)send_auto_endpoint(false, false, 0.0f, 0u, CUSTOM_CAN_AUTO_ENDPOINT_DEFAULT_START_US, false);
             }
             print_ok_or_busy("ARM", send_selected_command_frame());
@@ -369,6 +422,75 @@ static void handle_line(char *line)
         return;
     }
 
+    if (strcmp(cmd, "FFMODEL") == 0 || strcmp(cmd, "FF_MODEL") == 0) {
+        unsigned int model_type = 0u, point_count = 0u, order = 0u;
+        if (sscanf(args, "%u %u %u", &model_type, &point_count, &order) == 3 &&
+            model_type <= CUSTOM_CAN_FF_MODEL_PIECEWISE &&
+            point_count <= CUSTOM_CAN_FF_MODEL_MAX_POINTS &&
+            order <= CUSTOM_CAN_FF_MODEL_MAX_POLY_ORDER) {
+            const bool ok_select = send_select_before_targeted_command();
+            print_ok_or_busy("FFMODEL", ok_select && send_ff_model_meta((uint8_t)model_type, (uint8_t)point_count, (uint8_t)order));
+        } else {
+            printf("ERR BAD_FFMODEL usage=FFMODEL <type_0_linear_1_poly_2_piecewise> <point_count_0_to_12> <order_0_to_3>\r\n");
+        }
+        return;
+    }
+
+    if (strcmp(cmd, "FFRPM") == 0 || strcmp(cmd, "FF_RPM") == 0) {
+        float idle_rpm = 0.0f, max_rpm = 0.0f;
+        if (sscanf(args, "%f %f", &idle_rpm, &max_rpm) == 2 &&
+            idle_rpm >= 0.0f && max_rpm > idle_rpm && max_rpm <= 50000.0f) {
+            const bool ok_select = send_select_before_targeted_command();
+            print_ok_or_busy("FFRPM", ok_select && send_ff_model_rpm(idle_rpm, max_rpm));
+        } else {
+            printf("ERR BAD_FFRPM usage=FFRPM <idle_rpm> <max_rpm>\r\n");
+        }
+        return;
+    }
+
+    if (strcmp(cmd, "FFCOEFF") == 0 || strcmp(cmd, "FF_COEFF") == 0) {
+        unsigned int index = 0u;
+        float value = 0.0f;
+        if (sscanf(args, "%u %f", &index, &value) == 2 && index <= CUSTOM_CAN_FF_MODEL_MAX_POLY_ORDER) {
+            const bool ok_select = send_select_before_targeted_command();
+            print_ok_or_busy("FFCOEFF", ok_select && send_ff_model_coeff((uint8_t)index, value));
+        } else {
+            printf("ERR BAD_FFCOEFF usage=FFCOEFF <index_0_to_3> <float_value>\r\n");
+        }
+        return;
+    }
+
+    if (strcmp(cmd, "FFPOINT") == 0 || strcmp(cmd, "FF_POINT") == 0) {
+        unsigned int index = 0u, us = 0u;
+        float pct = 0.0f;
+        if (sscanf(args, "%u %f %u", &index, &pct, &us) == 3 &&
+            index < CUSTOM_CAN_FF_MODEL_MAX_POINTS && pct >= 0.0f && pct <= 100.0f &&
+            us >= 1000u && us <= 2000u) {
+            const uint16_t pct_x100 = (uint16_t)(pct * 100.0f + 0.5f);
+            const bool ok_select = send_select_before_targeted_command();
+            print_ok_or_busy("FFPOINT", ok_select && send_ff_model_point((uint8_t)index, pct_x100, (uint16_t)us));
+        } else {
+            printf("ERR BAD_FFPOINT usage=FFPOINT <index_0_to_11> <throttle_pct_0_to_100> <us_1000_to_2000>\r\n");
+        }
+        return;
+    }
+
+    if (strcmp(cmd, "FFCOMMIT") == 0 || strcmp(cmd, "FF_COMMIT") == 0) {
+        const bool ok_select = send_select_before_targeted_command();
+        print_ok_or_busy("FFCOMMIT", ok_select && send_ff_model_action(CUSTOM_CAN_FF_MODEL_ACTION_COMMIT));
+        return;
+    }
+    if (strcmp(cmd, "FFRESET") == 0 || strcmp(cmd, "FF_RESET") == 0) {
+        const bool ok_select = send_select_before_targeted_command();
+        print_ok_or_busy("FFRESET", ok_select && send_ff_model_action(CUSTOM_CAN_FF_MODEL_ACTION_RESET));
+        return;
+    }
+    if (strcmp(cmd, "FFCANCEL") == 0 || strcmp(cmd, "FF_CANCEL") == 0) {
+        const bool ok_select = send_select_before_targeted_command();
+        print_ok_or_busy("FFCANCEL", ok_select && send_ff_model_action(CUSTOM_CAN_FF_MODEL_ACTION_CANCEL));
+        return;
+    }
+
     if (strcmp(cmd, "STARTCFG") == 0 || strcmp(cmd, "START_CONFIG") == 0) {
         unsigned int start_us = 0u;
         unsigned int hold_ms = 0u;
@@ -403,16 +525,31 @@ static void handle_line(char *line)
 
     if (strcmp(cmd, "PWMBYPASS") == 0 || strcmp(cmd, "PWM_BYPASS") == 0 || strcmp(cmd, "SERVO_BYPASS") == 0) {
         unsigned int throttle_us = 0u;
-        if (sscanf(args, "%u", &throttle_us) == 1 && throttle_us <= 65535u) {
-            const bool ok_select = send_select_before_targeted_command();
-            print_ok_or_busy("PWMBYPASS", ok_select && send_manual_pwm_bypass(true, (uint16_t)throttle_us));
+        if (sscanf(args, "%u", &throttle_us) == 1 && throttle_us >= 1000u && throttle_us <= 2000u) {
+            if (!g_armed || g_selected_id == 0u) {
+                printf("ERR BYPASS_REQUIRES_ARM selected=%lu armed=%u\r\n",
+                       (unsigned long)g_selected_id, g_armed ? 1u : 0u);
+                return;
+            }
+            // Restore/refresh the armed command link before enabling the exact
+            // PWM override. The controller clears bypass whenever it disarms.
+            const bool ok_cmd = send_selected_command_frame();
+            sleep_us(300);
+            const bool ok_bypass = send_manual_pwm_bypass(true, (uint16_t)throttle_us);
+            const bool ok = ok_cmd && ok_bypass;
+            if (ok) {
+                g_pwm_bypass_us = (uint16_t)throttle_us;
+                g_pwm_bypass_active = true;
+            }
+            print_ok_or_busy("PWMBYPASS", ok);
         } else {
-            printf("ERR BAD_PWMBYPASS usage=PWMBYPASS <throttle_us>\r\n");
+            printf("ERR BAD_PWMBYPASS usage=PWMBYPASS <1000..2000_us>\r\n");
         }
         return;
     }
 
     if (strcmp(cmd, "PWMBYPASS_STOP") == 0 || strcmp(cmd, "PWM_BYPASS_STOP") == 0 || strcmp(cmd, "SERVO_BYPASS_STOP") == 0) {
+        g_pwm_bypass_active = false;
         const bool ok_select = send_select_before_targeted_command();
         print_ok_or_busy("PWMBYPASS_STOP", ok_select && send_manual_pwm_bypass(false, 0u));
         return;
@@ -547,6 +684,7 @@ static void handle_line(char *line)
     if (strcmp(cmd, "PANIC_ALL") == 0) {
         g_armed = false;
         g_throttle_pct = 0.0f;
+        g_pwm_bypass_active = false;
         (void)send_select(CUSTOM_CAN_BROADCAST_BOARD_ID);
         (void)send_action(CUSTOM_CAN_ACTION_GLOBAL_DISARM, true);
         print_ok_or_busy("PANIC_ALL", send_command_frame());
@@ -727,6 +865,31 @@ static void print_config_ff_max(const CanFrame *frame)
     printf("CFG FF100 rpm=%.8g us=%u selected=%lu\r\n", (double)rpm, us, (unsigned long)g_selected_id);
 }
 
+static void print_config_ff_model_meta(const CanFrame *frame)
+{
+    if (frame->data_len < 4u) return;
+    printf("CFG FFMODEL type=%u points=%u order=%u max_points=%u selected=%lu\r\n",
+           frame->data[0], frame->data[1], frame->data[2], frame->data[3], (unsigned long)g_selected_id);
+}
+
+static void print_config_ff_model_coeff(const CanFrame *frame)
+{
+    if (frame->data_len < 6u) return;
+    const uint8_t index = frame->data[0];
+    const float value = custom_can_float_load(&frame->data[2]);
+    printf("CFG FFCOEFF index=%u value=%.9g selected=%lu\r\n", index, (double)value, (unsigned long)g_selected_id);
+}
+
+static void print_config_ff_model_point(const CanFrame *frame)
+{
+    if (frame->data_len < 6u) return;
+    const uint8_t index = frame->data[0];
+    const uint16_t pct_x100 = custom_can_le16_load(&frame->data[2]);
+    const uint16_t us = custom_can_le16_load(&frame->data[4]);
+    printf("CFG FFPOINT index=%u pct=%.2f us=%u selected=%lu\r\n",
+           index, (double)pct_x100 / 100.0, us, (unsigned long)g_selected_id);
+}
+
 static void print_config_misc(const CanFrame *frame)
 {
     if (frame->data_len < 8u) return;
@@ -765,6 +928,12 @@ static void poll_can(void)
             print_config_ff_max(&frame);
         } else if (frame_id_is(&frame, CUSTOM_CAN_ID_CONFIG_MISC)) {
             print_config_misc(&frame);
+        } else if (frame_id_is(&frame, CUSTOM_CAN_ID_CONFIG_FF_MODEL_META)) {
+            print_config_ff_model_meta(&frame);
+        } else if (frame_id_is(&frame, CUSTOM_CAN_ID_CONFIG_FF_MODEL_COEFF)) {
+            print_config_ff_model_coeff(&frame);
+        } else if (frame_id_is(&frame, CUSTOM_CAN_ID_CONFIG_FF_MODEL_POINT)) {
+            print_config_ff_model_point(&frame);
         }
 #if BRIDGE_PRINT_RX_RAW
         else {
@@ -780,7 +949,7 @@ int main(void)
     sleep_ms(1200);
 
     printf("BRIDGE READY custom_can_v2\r\n");
-    printf("INFO commands=PING,INFO,PROBE,SCAN,SELECT,CLEAR_SELECT,CMD,ARM,THROTTLE,PID,FF0,FF100,STARTCFG,PWMTEST,PWMTEST_STOP,PWMBYPASS,PWMBYPASS_STOP,THRESH,HALLCAL,HALLCAL_STOP,RATE,IDENTIFY,BLINK,STOP_IDENTIFY,SERVO_TEST,AUTO0,AUTO100,AUTO_STOP,GETCFG,SETID,PANIC_ALL\r\n");
+    printf("INFO commands=PING,INFO,PROBE,SCAN,SELECT,CLEAR_SELECT,CMD,ARM,THROTTLE,PID,FF0,FF100,FFMODEL,FFRPM,FFCOEFF,FFPOINT,FFCOMMIT,FFRESET,FFCANCEL,STARTCFG,PWMTEST,PWMTEST_STOP,PWMBYPASS,PWMBYPASS_STOP,THRESH,HALLCAL,HALLCAL_STOP,RATE,IDENTIFY,BLINK,STOP_IDENTIFY,SERVO_TEST,AUTO0,AUTO100,AUTO_STOP,GETCFG,SETID,PANIC_ALL\r\n");
 
     if (!mcp2518fd_init()) {
         printf("ERR MCP2518FD_INIT_FAILED\r\n");
@@ -815,6 +984,12 @@ int main(void)
             // missed SELECT frame from making TEL A/B/C disappear while the GUI
             // still shows an engine selected.
             (void)send_selected_command_frame();
+            if (g_pwm_bypass_active && g_armed) {
+                // Maintain bypass on every bridge heartbeat instead of treating
+                // it as a one-shot frame.
+                sleep_us(300);
+                (void)send_manual_pwm_bypass(true, g_pwm_bypass_us);
+            }
             next_command_ms += DEBUG_COMMAND_HEARTBEAT_MS;
         }
 

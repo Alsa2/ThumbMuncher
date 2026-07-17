@@ -46,3 +46,10 @@ This patch adds:
 - verify commanding your output above ~1% starts the cranker only on the selected node
 - verify the choke opens after 15 counted turns
 - verify `rpm`, `temp_c`, `current_a`, `runtime_s`, and `state` KeyValue messages appear on the bus
+## Fitted feedforward model update
+
+The runtime configuration now contains a validated feedforward model rather than relying only on a linear endpoint interpolation. Supported models are linear, polynomial order 1–3, and piecewise linear with up to 12 knots. Model transfers arrive through an atomic staging buffer; incomplete, timed-out, non-monotonic, or out-of-range transfers do not replace the active model. Valid commits and resets may be applied while running; PID state is tracked so the actuator PWM is unchanged at the swap instant. FRAM configuration version 5 stores the model and migrates older records to a two-point linear model. Reflash this controller for the fitting GUI/probe release.
+
+## Priming reset diagnostics
+
+Startup now prints `watchdog_caused_reboot`. A race between main-context Hall timeout handling and the Hall sampling interrupt was fixed so a fresh period cannot be erased. FRAM persistence is deferred while in `ENGINE_PRIMING_AFTER_SPIN`. The normal 2000 ms zero-RPM timeout still intentionally returns the state machine to `ENGINE_ARMED_WAIT_FOR_SPIN`; that transition is not a processor reboot.
